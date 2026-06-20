@@ -1,0 +1,23 @@
+{
+  "name": "pokemon-auctions",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Daily eBay Pokemon card auction tracker",
+  "scripts": {
+    "start": "node src/server.js",
+    "scrape": "node src/run-daily.js",
+    "init-db": "node src/db.js --init"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.5.0",
+    "cheerio": "^1.0.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "node-cron": "^4.4.1",
+    "resend": "^4.0.1"
+  }
+}
