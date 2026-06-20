@@ -26,6 +26,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(express.json());
 
+// Unauthenticated healthcheck — used by Railway / uptime monitors.
+// Must come BEFORE the auth middleware so it isn't gated.
+app.get('/healthz', (req, res) => res.json({ ok: true }));
+
 // Basic Auth: gate everything if AUTH_PASSWORD is set. Local dev with no
 // AUTH_PASSWORD env var skips auth entirely (so the local UI keeps working).
 const AUTH_PASSWORD = process.env.AUTH_PASSWORD;
