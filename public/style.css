@@ -360,6 +360,36 @@ h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; 
   font-weight: 500;
 }
 
+.listing .market-line {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed #e3e5e8;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.listing .market-price {
+  color: #888;
+}
+.listing .market-diff {
+  font-weight: 700;
+  margin-top: 2px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
+}
+.listing .market-diff.below {
+  background: #e6f6ec;
+  color: #1b7a3d;
+}
+.listing .market-diff.above {
+  background: #fde8e8;
+  color: #b1241c;
+}
+.listing .market-diff.even {
+  background: #f0f0f0;
+  color: #666;
+}
+
 .empty {
   padding: 40px;
   text-align: center;

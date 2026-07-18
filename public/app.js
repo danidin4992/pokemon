@@ -148,17 +148,7 @@ function fmtUsd(cents) {
 
 function renderPcStrip(s) {
   if (!s.pricecharting_url) return '';
-  const tiers = [
-    { key: 'pc_loose_cents', label: 'Raw', cls: '' },
-    { key: 'pc_grade9_cents', label: 'PSA 9', cls: '' },
-    { key: 'pc_psa10_cents', label: 'PSA 10', cls: 'psa10' },
-  ];
-  const chips = tiers
-    .map(
-      (t) =>
-        `<span class="pc-tier ${t.cls}"><span class="label">${t.label}</span><span class="value">${escapeHtml(fmtMoney(s[t.key]))}</span></span>`
-    )
-    .join('');
+  const chips = `<span class="pc-tier psa10"><span class="label">PSA 10</span><span class="value">${escapeHtml(fmtMoney(s.pc_psa10_cents))}</span></span>`;
   const updated = s.pc_updated_at
     ? `updated ${fmtAgo(s.pc_updated_at)}`
     : '<span class="pc-stale">not fetched</span>';
@@ -342,17 +332,7 @@ function renderListings() {
   if (searchId) {
     const s = searches.find((x) => x.id === parseInt(searchId));
     if (s && s.pricecharting_url) {
-      const tiers = [
-        ['Raw', s.pc_loose_cents, ''],
-        ['PSA 9', s.pc_grade9_cents, ''],
-        ['PSA 10', s.pc_psa10_cents, 'psa10'],
-      ];
-      const chips = tiers
-        .map(
-          ([label, cents, cls]) =>
-            `<span class="pc-tier ${cls}"><span class="label">${label}</span><span class="value">${escapeHtml(fmtMoney(cents))}</span></span>`
-        )
-        .join(' ');
+      const chips = `<span class="pc-tier psa10"><span class="label">PSA 10</span><span class="value">${escapeHtml(fmtMoney(s.pc_psa10_cents))}</span></span>`;
       priceSummaryHtml = `<div class="price-summary">
         <span class="ps-name">${escapeHtml(s.pc_product_name || s.name)}</span>
         ${chips}
@@ -368,8 +348,28 @@ function renderListings() {
   }
 
   container.innerHTML = priceSummaryHtml + filtered
-    .map(
-      (l) => `
+    .map((l) => renderListingRow(l))
+    .join('');
+}
+
+function renderMarketDiff(bidCents, marketCents) {
+  if (bidCents == null || marketCents == null || marketCents === 0) return '';
+  const diff = bidCents - marketCents;
+  const pct = Math.round((diff / marketCents) * 100);
+  const isBelow = diff < 0;
+  const cls = isBelow ? 'below' : (diff > 0 ? 'above' : 'even');
+  const sign = diff > 0 ? '+' : (diff < 0 ? '−' : '');
+  const abs = fmtUsd(Math.abs(diff));
+  return `<div class="market-line">
+    <div class="market-price">Market: ${escapeHtml(fmtUsd(marketCents))}</div>
+    <div class="market-diff ${cls}">${sign}${escapeHtml(abs)} · ${sign}${Math.abs(pct)}%</div>
+  </div>`;
+}
+
+function renderListingRow(l) {
+  const bidCents = l.price_usd_cents;
+  const marketCents = l.search_pc_psa10_cents;
+  return `
     <div class="listing">
       <a href="${escapeHtml(l.url)}" target="_blank" rel="noopener">
         ${l.image_url ? `<img src="${escapeHtml(l.image_url)}" alt="">` : '<div style="width:80px;height:80px;background:#f0f0f0;border-radius:6px"></div>'}
@@ -382,13 +382,12 @@ function renderListings() {
         </div>
       </div>
       <div class="price-block">
-        <div class="price" title="${escapeHtml(l.price_text || '')}">${escapeHtml(l.price_usd_cents != null ? fmtUsd(l.price_usd_cents) : l.price_text || '—')}</div>
+        <div class="price" title="${escapeHtml(l.price_text || '')}">${escapeHtml(bidCents != null ? fmtUsd(bidCents) : l.price_text || '—')}</div>
         <div class="bids">${l.bid_count ?? 0} bids</div>
         <div class="time-left">${fmtRelativeTime(l.ends_at)}</div>
+        ${renderMarketDiff(bidCents, marketCents)}
       </div>
-    </div>`
-    )
-    .join('');
+    </div>`;
 }
 
 async function loadLastRun() {

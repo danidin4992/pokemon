@@ -265,7 +265,8 @@ export function listListings({ activeOnly = true } = {}) {
   const sql = `
     SELECT l.*, s.name AS search_name, s.url AS search_url,
            s.required_keywords AS search_required_keywords,
-           s.forbidden_keywords AS search_forbidden_keywords
+           s.forbidden_keywords AS search_forbidden_keywords,
+           s.pc_psa10_cents AS search_pc_psa10_cents
     FROM listings l
     JOIN searches s ON s.id = l.search_id
     ${activeOnly ? 'WHERE l.ends_at IS NULL OR l.ends_at > ?' : ''}
@@ -280,7 +281,8 @@ export function listListingsForSearch(searchId) {
   return db
     .prepare(
       `SELECT l.*, s.required_keywords AS search_required_keywords,
-              s.forbidden_keywords AS search_forbidden_keywords
+              s.forbidden_keywords AS search_forbidden_keywords,
+              s.pc_psa10_cents AS search_pc_psa10_cents
        FROM listings l
        JOIN searches s ON s.id = l.search_id
        WHERE l.search_id = ? AND (l.ends_at IS NULL OR l.ends_at > ?)

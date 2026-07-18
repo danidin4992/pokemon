@@ -10,6 +10,19 @@ function fmtPrice(l, rates) {
   return l.price_text || '—';
 }
 
+function renderEmailDiff(bidCents, marketCents) {
+  if (bidCents == null || marketCents == null || marketCents === 0) return '';
+  const diff = bidCents - marketCents;
+  const pct = Math.round((diff / marketCents) * 100);
+  const sign = diff > 0 ? '+' : (diff < 0 ? '−' : '');
+  const abs = formatUsd(Math.abs(diff));
+  const bg = diff < 0 ? '#e6f6ec' : (diff > 0 ? '#fde8e8' : '#f0f0f0');
+  const color = diff < 0 ? '#1b7a3d' : (diff > 0 ? '#b1241c' : '#666');
+  return `<div style="margin-top:6px;padding:3px 8px;background:${bg};color:${color};border-radius:4px;font-size:11px;font-weight:700;display:inline-block">
+    ${sign}${abs} · ${sign}${Math.abs(pct)}% vs PSA 10
+  </div>`;
+}
+
 function fmtTimeLeft(l) {
   if (l.time_left_text) return l.time_left_text;
   if (!l.ends_at) return '—';
@@ -56,11 +69,11 @@ export function buildDigestHtml() {
       ${escapeHtml(s.name)}
       <span style="font-weight:normal;font-size:13px;color:#666">— ${ending24h.length} ending in 24h / ${filtered.length} matching</span>
     </h2>`;
-    if (s.pricecharting_url && s.pc_psa10_cents != null) {
-      const fmtUsd = (c) => (c == null ? '—' : '$' + (c / 100).toFixed(0));
+    const marketCents = s.pc_psa10_cents;
+    if (s.pricecharting_url && marketCents != null) {
+      const fmtUsdInt = (c) => (c == null ? '—' : '$' + (c / 100).toFixed(0));
       body += `<div style="font-size:12px;color:#666;margin:-4px 0 8px;font-family:system-ui,sans-serif">
-        PriceCharting · Raw ${fmtUsd(s.pc_loose_cents)} · PSA 9 ${fmtUsd(s.pc_grade9_cents)} ·
-        <strong style="color:#b45f00">PSA 10 ${fmtUsd(s.pc_psa10_cents)}</strong>
+        <strong style="color:#b45f00">PSA 10 market: ${fmtUsdInt(marketCents)}</strong>
       </div>`;
     }
 
@@ -85,6 +98,7 @@ export function buildDigestHtml() {
           <div style="font-weight:700;font-size:14px" title="${escapeHtml(l.price_text || '')}">${escapeHtml(fmtPrice(l, rates))}</div>
           <div style="color:#666;margin-top:4px">${l.bid_count ?? 0} bids</div>
           <div style="color:#e53238;font-weight:600;margin-top:2px">${escapeHtml(fmtTimeLeft(l))}</div>
+          ${renderEmailDiff(toUsdCents(l.price_numeric, l.price_currency, rates), marketCents)}
         </td>
       </tr>`;
     }
