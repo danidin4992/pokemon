@@ -39,6 +39,37 @@ export async function fetchPriceChartingPage(url) {
   return stdout;
 }
 
+function extractPsa10History(html) {
+  // PriceCharting embeds Highcharts series data in a global:
+  //   VGPC.chart_data = {"manualonly":[[ts_ms, price_cents], ...], ...}
+  // We only care about manualonly (= PSA 10).
+  const marker = 'VGPC.chart_data';
+  const start = html.indexOf(marker);
+  if (start < 0) return [];
+  const braceStart = html.indexOf('{', start);
+  if (braceStart < 0) return [];
+  // Naive brace-balance to find the closing }
+  let depth = 0;
+  let end = -1;
+  for (let i = braceStart; i < html.length; i++) {
+    const c = html[i];
+    if (c === '{') depth++;
+    else if (c === '}') {
+      depth--;
+      if (depth === 0) { end = i; break; }
+    }
+  }
+  if (end < 0) return [];
+  const jsonStr = html.substring(braceStart, end + 1);
+  let obj;
+  try { obj = JSON.parse(jsonStr); } catch { return []; }
+  const series = obj.manualonly;
+  if (!Array.isArray(series)) return [];
+  return series
+    .filter((pt) => Array.isArray(pt) && pt.length === 2 && pt[1] > 0)
+    .map(([ts_ms, cents]) => ({ ts_ms: Math.floor(ts_ms), cents: Math.round(cents) }));
+}
+
 export function parseProductPage(html) {
   const $ = cheerio.load(html);
 
@@ -57,10 +88,13 @@ export function parseProductPage(html) {
     prices[key] = parsePriceCents(priceText);
   }
 
+  const psa10History = extractPsa10History(html);
+
   return {
     product_id: productId,
     product_name: productName,
     prices,
+    psa10_history: psa10History,
   };
 }
 

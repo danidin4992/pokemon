@@ -18,6 +18,8 @@ import {
   enableNotification,
   disableNotification,
   activeNotificationListingIds,
+  upsertPriceHistory,
+  getPriceHistory,
 } from './db.js';
 import { runAllSearches } from './runner.js';
 import { sendDigest } from './emailer.js';
@@ -64,7 +66,12 @@ if (AUTH_PASSWORD) {
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 app.get('/api/searches', (req, res) => {
-  res.json(listSearches());
+  const rows = listSearches();
+  const enriched = rows.map((s) => ({
+    ...s,
+    psa10_history: getPriceHistory(s.id),
+  }));
+  res.json(enriched);
 });
 
 app.post('/api/searches', async (req, res) => {
@@ -112,6 +119,7 @@ app.post('/api/searches/:id/refresh-prices', async (req, res) => {
   try {
     const info = await fetchProductInfo(search.pricecharting_url);
     updateSearchPrices(id, info);
+    if (info.psa10_history?.length) upsertPriceHistory(id, info.psa10_history);
     res.json({ ok: true, info });
   } catch (e) {
     res.status(500).json({ error: e.message });

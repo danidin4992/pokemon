@@ -164,9 +164,52 @@ function renderEndTimes(endAtSec) {
   return `<div class="end-times">Ends <span class="tz">${il} IL</span> · <span class="tz">${ny} NY</span></div>`;
 }
 
+function renderSparkline(history, currentCents) {
+  if (!Array.isArray(history) || history.length < 2) return '';
+  const W = 220, H = 40, PAD = 3;
+  const pts = history.filter((p) => p.price_cents > 0);
+  if (pts.length < 2) return '';
+  const values = pts.map((p) => p.price_cents);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const first = pts[0].ts_ms;
+  const last = pts[pts.length - 1].ts_ms;
+  const tRange = last - first || 1;
+  const xy = pts.map((p) => {
+    const x = PAD + ((p.ts_ms - first) / tRange) * (W - 2 * PAD);
+    const y = PAD + (1 - (p.price_cents - min) / range) * (H - 2 * PAD);
+    return { x, y, ts: p.ts_ms, cents: p.price_cents };
+  });
+  const path = xy.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const areaPath = `${path} L${xy[xy.length - 1].x.toFixed(1)},${H - PAD} L${xy[0].x.toFixed(1)},${H - PAD} Z`;
+  const lastPt = xy[xy.length - 1];
+  const dots = xy
+    .map((p) => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="1.8" fill="#e05a1c"><title>${new Date(p.ts).toISOString().slice(0, 10)}: ${fmtUsd(p.cents)}</title></circle>`)
+    .join('');
+  const trend = pts[pts.length - 1].price_cents - pts[0].price_cents;
+  const trendClass = trend > 0 ? 'up' : trend < 0 ? 'down' : 'flat';
+  const trendPct = Math.round((trend / pts[0].price_cents) * 100);
+  const firstDate = new Date(pts[0].ts_ms).toISOString().slice(0, 7);
+  const lastDate = new Date(pts[pts.length - 1].ts_ms).toISOString().slice(0, 7);
+  return `<div class="pc-spark ${trendClass}">
+    <svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" preserveAspectRatio="none">
+      <path d="${areaPath}" fill="#fce9dc" opacity="0.7"/>
+      <path d="${path}" fill="none" stroke="#e05a1c" stroke-width="1.5"/>
+      <circle cx="${lastPt.x.toFixed(1)}" cy="${lastPt.y.toFixed(1)}" r="2.6" fill="#e05a1c"/>
+      ${dots}
+    </svg>
+    <div class="pc-spark-meta">
+      <span class="pc-spark-range">${firstDate} → ${lastDate}</span>
+      <span class="pc-spark-trend">${trend > 0 ? '↑' : trend < 0 ? '↓' : '→'} ${trendPct > 0 ? '+' : ''}${trendPct}%</span>
+    </div>
+  </div>`;
+}
+
 function renderPcStrip(s) {
   if (!s.pricecharting_url) return '';
   const chips = `<span class="pc-tier psa10"><span class="label">PSA 10</span><span class="value">${escapeHtml(fmtMoney(s.pc_psa10_cents))}</span></span>`;
+  const spark = renderSparkline(s.psa10_history, s.pc_psa10_cents);
   const updated = s.pc_updated_at
     ? `updated ${fmtAgo(s.pc_updated_at)}`
     : '<span class="pc-stale">not fetched</span>';
@@ -175,6 +218,7 @@ function renderPcStrip(s) {
     ${chips}
     <a class="pc-link" href="${escapeHtml(s.pricecharting_url)}" target="_blank" rel="noopener">${updated} ↗</a>
     <button class="secondary" data-action="refresh-pc" style="padding:2px 8px;font-size:11px">↻</button>
+    ${spark}
   </div>`;
 }
 
@@ -370,17 +414,20 @@ function renderListings() {
     .join('');
 }
 
-function renderMarketDiff(bidCents, marketCents) {
-  if (bidCents == null || marketCents == null || marketCents === 0) return '';
+function renderMarketInline(bidCents, marketCents) {
+  if (marketCents == null || marketCents === 0) return '';
+  const marketStr = fmtUsd(marketCents);
+  if (bidCents == null) {
+    return `<div class="market-inline"><span class="market-label">Market ${escapeHtml(marketStr)}</span></div>`;
+  }
   const diff = bidCents - marketCents;
   const pct = Math.round((diff / marketCents) * 100);
-  const isBelow = diff < 0;
-  const cls = isBelow ? 'below' : (diff > 0 ? 'above' : 'even');
+  const cls = diff < 0 ? 'below' : (diff > 0 ? 'above' : 'even');
   const sign = diff > 0 ? '+' : (diff < 0 ? '−' : '');
   const abs = fmtUsd(Math.abs(diff));
-  return `<div class="market-line">
-    <div class="market-price">Market: ${escapeHtml(fmtUsd(marketCents))}</div>
-    <div class="market-diff ${cls}">${sign}${escapeHtml(abs)} · ${sign}${Math.abs(pct)}%</div>
+  return `<div class="market-inline">
+    <span class="market-label">Market ${escapeHtml(marketStr)}</span>
+    <span class="market-diff ${cls}">${sign}${escapeHtml(abs)} · ${sign}${Math.abs(pct)}%</span>
   </div>`;
 }
 
@@ -405,10 +452,10 @@ function renderListingRow(l) {
       </div>
       <div class="price-block">
         <div class="price" title="${escapeHtml(l.price_text || '')}">${escapeHtml(bidCents != null ? fmtUsd(bidCents) : l.price_text || '—')}</div>
+        ${renderMarketInline(bidCents, marketCents)}
         <div class="bids">${l.bid_count ?? 0} bids</div>
         <div class="time-left">${fmtRelativeTime(l.ends_at)}</div>
         ${renderEndTimes(l.ends_at)}
-        ${renderMarketDiff(bidCents, marketCents)}
       </div>
     </div>`;
 }

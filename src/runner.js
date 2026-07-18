@@ -5,6 +5,7 @@ import {
   finishRun,
   updateSearchPrices,
   deleteListingsNotInSet,
+  upsertPriceHistory,
 } from './db.js';
 import { scrapeSearch } from './scraper.js';
 import { fetchProductInfo } from './pricecharting.js';
@@ -50,6 +51,9 @@ export async function runAllSearches({ onProgress } = {}) {
           onProgress?.({ stage: 'pc-fetching', search });
           const info = await fetchProductInfo(search.pricecharting_url);
           updateSearchPrices(search.id, info);
+          if (info.psa10_history && info.psa10_history.length) {
+            upsertPriceHistory(search.id, info.psa10_history);
+          }
           onProgress?.({ stage: 'pc-fetched', search, info });
         } catch (e) {
           onProgress?.({ stage: 'pc-error', search, error: e.message });

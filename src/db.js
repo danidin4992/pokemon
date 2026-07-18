@@ -74,6 +74,13 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_notifications_pending ON notifications(notified_at, ends_at);
 
+  CREATE TABLE IF NOT EXISTS pc_price_history (
+    search_id INTEGER NOT NULL REFERENCES searches(id) ON DELETE CASCADE,
+    ts_ms INTEGER NOT NULL,
+    price_cents INTEGER NOT NULL,
+    PRIMARY KEY (search_id, ts_ms)
+  );
+
   CREATE TABLE IF NOT EXISTS runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     started_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
@@ -381,6 +388,33 @@ export function markNotified(id, error = null) {
   db.prepare(
     `UPDATE notifications SET notified_at = strftime('%s','now'), error = ? WHERE id = ?`
   ).run(error, id);
+}
+
+const upsertHistoryStmt = db.prepare(
+  `INSERT INTO pc_price_history (search_id, ts_ms, price_cents)
+   VALUES (?, ?, ?)
+   ON CONFLICT(search_id, ts_ms) DO UPDATE SET price_cents = excluded.price_cents`
+);
+
+export function upsertPriceHistory(searchId, history) {
+  if (!Array.isArray(history) || history.length === 0) return;
+  const tx = db.transaction((items) => {
+    for (const p of items) {
+      if (p && p.ts_ms && p.cents > 0) {
+        upsertHistoryStmt.run(searchId, p.ts_ms, p.cents);
+      }
+    }
+  });
+  tx(history);
+}
+
+export function getPriceHistory(searchId) {
+  return db
+    .prepare(
+      `SELECT ts_ms, price_cents FROM pc_price_history
+       WHERE search_id = ? ORDER BY ts_ms ASC`
+    )
+    .all(searchId);
 }
 
 if (process.argv.includes('--init')) {
