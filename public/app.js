@@ -164,9 +164,17 @@ function renderEndTimes(endAtSec) {
   return `<div class="end-times">Ends <span class="tz">${il} IL</span> · <span class="tz">${ny} NY</span></div>`;
 }
 
+function fmtUsdCompact(cents) {
+  if (cents == null) return '—';
+  const d = cents / 100;
+  if (d >= 1000) return '$' + (d / 1000).toFixed(1) + 'k';
+  return '$' + Math.round(d);
+}
+
 function renderSparkline(history, currentCents) {
   if (!Array.isArray(history) || history.length < 2) return '';
-  const W = 220, H = 40, PAD = 3;
+  const W = 320, H = 90;
+  const PAD_L = 44, PAD_R = 52, PAD_T = 12, PAD_B = 22;
   const pts = history.filter((p) => p.price_cents > 0);
   if (pts.length < 2) return '';
   const values = pts.map((p) => p.price_cents);
@@ -176,31 +184,69 @@ function renderSparkline(history, currentCents) {
   const first = pts[0].ts_ms;
   const last = pts[pts.length - 1].ts_ms;
   const tRange = last - first || 1;
+  const chartW = W - PAD_L - PAD_R;
+  const chartH = H - PAD_T - PAD_B;
   const xy = pts.map((p) => {
-    const x = PAD + ((p.ts_ms - first) / tRange) * (W - 2 * PAD);
-    const y = PAD + (1 - (p.price_cents - min) / range) * (H - 2 * PAD);
+    const x = PAD_L + ((p.ts_ms - first) / tRange) * chartW;
+    const y = PAD_T + (1 - (p.price_cents - min) / range) * chartH;
     return { x, y, ts: p.ts_ms, cents: p.price_cents };
   });
   const path = xy.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-  const areaPath = `${path} L${xy[xy.length - 1].x.toFixed(1)},${H - PAD} L${xy[0].x.toFixed(1)},${H - PAD} Z`;
+  const areaPath = `${path} L${xy[xy.length - 1].x.toFixed(1)},${PAD_T + chartH} L${xy[0].x.toFixed(1)},${PAD_T + chartH} Z`;
   const lastPt = xy[xy.length - 1];
+  const firstPt = xy[0];
+
+  const maxIdx = values.indexOf(max);
+  const minIdx = values.indexOf(min);
+  const maxPt = xy[maxIdx];
+  const minPt = xy[minIdx];
+
   const dots = xy
-    .map((p) => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="1.8" fill="#e05a1c"><title>${new Date(p.ts).toISOString().slice(0, 10)}: ${fmtUsd(p.cents)}</title></circle>`)
+    .map((p) => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2.2" fill="#e05a1c"><title>${new Date(p.ts).toISOString().slice(0, 10)}: ${fmtUsd(p.cents)}</title></circle>`)
     .join('');
+
   const trend = pts[pts.length - 1].price_cents - pts[0].price_cents;
   const trendClass = trend > 0 ? 'up' : trend < 0 ? 'down' : 'flat';
   const trendPct = Math.round((trend / pts[0].price_cents) * 100);
   const firstDate = new Date(pts[0].ts_ms).toISOString().slice(0, 7);
   const lastDate = new Date(pts[pts.length - 1].ts_ms).toISOString().slice(0, 7);
+
+  // Y-axis grid lines: max and min horizontal reference lines with labels
+  const gridMaxY = PAD_T;
+  const gridMinY = PAD_T + chartH;
+  const midY = PAD_T + chartH / 2;
+  const midValue = min + range / 2;
+
+  // Position the "current" and max/min labels beside their dots
+  const currentLabelY = Math.max(PAD_T + 6, Math.min(H - PAD_B - 2, lastPt.y + 3));
+  const maxLabelY = Math.max(PAD_T + 6, maxPt.y - 4);
+  const minLabelY = Math.min(H - PAD_B - 2, minPt.y + 10);
+
   return `<div class="pc-spark ${trendClass}">
-    <svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" preserveAspectRatio="none">
-      <path d="${areaPath}" fill="#fce9dc" opacity="0.7"/>
-      <path d="${path}" fill="none" stroke="#e05a1c" stroke-width="1.5"/>
-      <circle cx="${lastPt.x.toFixed(1)}" cy="${lastPt.y.toFixed(1)}" r="2.6" fill="#e05a1c"/>
+    <svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" preserveAspectRatio="xMidYMid meet">
+      <line x1="${PAD_L}" y1="${gridMaxY}" x2="${W - PAD_R}" y2="${gridMaxY}" stroke="#eee" stroke-width="0.5" stroke-dasharray="2,3"/>
+      <line x1="${PAD_L}" y1="${midY}" x2="${W - PAD_R}" y2="${midY}" stroke="#f2f2f2" stroke-width="0.5" stroke-dasharray="2,3"/>
+      <line x1="${PAD_L}" y1="${gridMinY}" x2="${W - PAD_R}" y2="${gridMinY}" stroke="#eee" stroke-width="0.5" stroke-dasharray="2,3"/>
+
+      <text x="${PAD_L - 4}" y="${gridMaxY + 3}" text-anchor="end" font-size="10" fill="#888" font-family="system-ui">${fmtUsdCompact(max)}</text>
+      <text x="${PAD_L - 4}" y="${midY + 3}" text-anchor="end" font-size="9" fill="#aaa" font-family="system-ui">${fmtUsdCompact(midValue)}</text>
+      <text x="${PAD_L - 4}" y="${gridMinY + 3}" text-anchor="end" font-size="10" fill="#888" font-family="system-ui">${fmtUsdCompact(min)}</text>
+
+      <path d="${areaPath}" fill="#fce9dc" opacity="0.55"/>
+      <path d="${path}" fill="none" stroke="#e05a1c" stroke-width="1.6"/>
       ${dots}
+      <circle cx="${lastPt.x.toFixed(1)}" cy="${lastPt.y.toFixed(1)}" r="3.4" fill="#e05a1c" stroke="white" stroke-width="1.5"/>
+
+      <text x="${lastPt.x + 6}" y="${currentLabelY}" font-size="11" fill="#b45f00" font-weight="700" font-family="system-ui">${fmtUsd(lastPt.cents)}</text>
+      ${maxIdx !== pts.length - 1 && maxIdx !== 0 ? `<text x="${maxPt.x.toFixed(1)}" y="${maxLabelY}" text-anchor="middle" font-size="9" fill="#666" font-family="system-ui">${fmtUsdCompact(max)}</text>` : ''}
+      ${minIdx !== pts.length - 1 && minIdx !== 0 ? `<text x="${minPt.x.toFixed(1)}" y="${minLabelY}" text-anchor="middle" font-size="9" fill="#666" font-family="system-ui">${fmtUsdCompact(min)}</text>` : ''}
+
+      <text x="${firstPt.x.toFixed(1)}" y="${H - 6}" text-anchor="start" font-size="9" fill="#888" font-family="system-ui">${firstDate}</text>
+      <text x="${lastPt.x.toFixed(1)}" y="${H - 6}" text-anchor="end" font-size="9" fill="#888" font-family="system-ui">${lastDate}</text>
     </svg>
     <div class="pc-spark-meta">
-      <span class="pc-spark-range">${firstDate} → ${lastDate}</span>
+      <span class="pc-spark-current">${fmtUsd(lastPt.cents)}</span>
+      <span class="pc-spark-range">${fmtUsdCompact(min)} – ${fmtUsdCompact(max)} · 6mo</span>
       <span class="pc-spark-trend">${trend > 0 ? '↑' : trend < 0 ? '↓' : '→'} ${trendPct > 0 ? '+' : ''}${trendPct}%</span>
     </div>
   </div>`;

@@ -448,20 +448,22 @@ h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; 
   border-top: 1px dashed #f0dcc4;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 14px;
 }
 .pc-spark svg {
   display: block;
   border-radius: 4px;
+  background: #fefaf5;
 }
 .pc-spark-meta {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   font-size: 11px;
 }
+.pc-spark-current { color: #b45f00; font-weight: 700; font-size: 15px; }
 .pc-spark-range { color: #888; font-weight: 500; }
-.pc-spark-trend { font-weight: 700; font-size: 12px; }
+.pc-spark-trend { font-weight: 700; font-size: 13px; }
 .pc-spark.up .pc-spark-trend { color: #b1241c; }
 .pc-spark.down .pc-spark-trend { color: #1b7a3d; }
 .pc-spark.flat .pc-spark-trend { color: #666; }
