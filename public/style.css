@@ -309,7 +309,7 @@ h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; 
 }
 .listing {
   display: grid;
-  grid-template-columns: 80px 1fr 140px;
+  grid-template-columns: 80px 1fr 110px 140px;
   gap: 14px;
   padding: 12px 14px;
   border-bottom: 1px solid #f0f0f0;
@@ -367,25 +367,41 @@ h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; 
   font-weight: 500;
 }
 
-.listing .notify-toggle {
-  display: inline-flex;
+.listing .notify-box {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  background: #f8f9fb;
+  border: 1px solid #e3e5e8;
+  border-radius: 6px;
+  align-self: center;
+}
+.listing .notify-heading {
+  font-size: 11px;
+  color: #666;
+  font-weight: 600;
+  margin-bottom: 3px;
+  letter-spacing: 0.02em;
+}
+.listing .notify-opt {
+  display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 8px;
   font-size: 12px;
-  color: #555;
+  color: #444;
   cursor: pointer;
   user-select: none;
-  padding: 3px 6px;
-  border-radius: 4px;
+  padding: 2px 4px;
+  border-radius: 3px;
   transition: background 0.15s;
 }
-.listing .notify-toggle:hover { background: #f0f4f8; }
-.listing .notify-toggle input {
+.listing .notify-opt:hover { background: #eef2f7; }
+.listing .notify-opt input {
   margin: 0;
   cursor: pointer;
 }
-.listing .notify-toggle input:checked + span {
+.listing .notify-opt input:checked + span {
   color: #0053a0;
   font-weight: 600;
 }

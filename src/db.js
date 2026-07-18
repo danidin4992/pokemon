@@ -63,14 +63,16 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS notifications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    listing_id TEXT NOT NULL UNIQUE,
+    listing_id TEXT NOT NULL,
+    lead_seconds INTEGER NOT NULL DEFAULT 3600,
     search_id INTEGER,
     title TEXT,
     url TEXT,
     ends_at INTEGER NOT NULL,
     created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
     notified_at INTEGER,
-    error TEXT
+    error TEXT,
+    UNIQUE(listing_id, lead_seconds)
   );
   CREATE INDEX IF NOT EXISTS idx_notifications_pending ON notifications(notified_at, ends_at);
 
@@ -118,6 +120,34 @@ function migrate() {
   add('pc_updated_at', 'INTEGER');
   add('required_keywords', 'TEXT'); // JSON array of strings
   add('forbidden_keywords', 'TEXT'); // JSON array of strings
+
+  // Migrate notifications: add lead_seconds column + composite UNIQUE.
+  // Rebuild table if old schema (UNIQUE on listing_id alone) is detected.
+  const notifCols = db.prepare(`PRAGMA table_info(notifications)`).all().map((c) => c.name);
+  if (notifCols.length && !notifCols.includes('lead_seconds')) {
+    db.exec(`
+      ALTER TABLE notifications RENAME TO _notifications_old;
+      CREATE TABLE notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        listing_id TEXT NOT NULL,
+        lead_seconds INTEGER NOT NULL DEFAULT 3600,
+        search_id INTEGER,
+        title TEXT,
+        url TEXT,
+        ends_at INTEGER NOT NULL,
+        created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+        notified_at INTEGER,
+        error TEXT,
+        UNIQUE(listing_id, lead_seconds)
+      );
+      INSERT INTO notifications
+        (listing_id, lead_seconds, search_id, title, url, ends_at, created_at, notified_at, error)
+      SELECT listing_id, 3600, search_id, title, url, ends_at, created_at, notified_at, error
+      FROM _notifications_old;
+      DROP TABLE _notifications_old;
+      CREATE INDEX IF NOT EXISTS idx_notifications_pending ON notifications(notified_at, ends_at);
+    `);
+  }
 }
 migrate();
 
@@ -342,46 +372,56 @@ export function getLastRun() {
     .get();
 }
 
-export function enableNotification({ listing_id, search_id, title, url, ends_at }) {
-  if (!listing_id || !ends_at) return;
+export function enableNotification({ listing_id, lead_seconds, search_id, title, url, ends_at }) {
+  if (!listing_id || !ends_at || !lead_seconds) return;
   db.prepare(
-    `INSERT INTO notifications (listing_id, search_id, title, url, ends_at)
-     VALUES (?, ?, ?, ?, ?)
-     ON CONFLICT(listing_id) DO UPDATE SET
+    `INSERT INTO notifications (listing_id, lead_seconds, search_id, title, url, ends_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(listing_id, lead_seconds) DO UPDATE SET
        search_id = excluded.search_id,
        title     = excluded.title,
        url       = excluded.url,
        ends_at   = excluded.ends_at`
-  ).run(listing_id, search_id ?? null, title ?? null, url ?? null, ends_at);
+  ).run(listing_id, lead_seconds, search_id ?? null, title ?? null, url ?? null, ends_at);
 }
 
-export function disableNotification(listing_id) {
+export function disableNotification(listing_id, lead_seconds) {
   // Only remove if not yet sent — keep history of sent ones for audit
-  db.prepare(
-    'DELETE FROM notifications WHERE listing_id = ? AND notified_at IS NULL'
-  ).run(listing_id);
+  if (lead_seconds) {
+    db.prepare(
+      'DELETE FROM notifications WHERE listing_id = ? AND lead_seconds = ? AND notified_at IS NULL'
+    ).run(listing_id, lead_seconds);
+  } else {
+    // disable all pending leads for a listing
+    db.prepare(
+      'DELETE FROM notifications WHERE listing_id = ? AND notified_at IS NULL'
+    ).run(listing_id);
+  }
 }
 
-export function activeNotificationListingIds() {
-  return new Set(
-    db
-      .prepare('SELECT listing_id FROM notifications WHERE notified_at IS NULL')
-      .all()
-      .map((r) => r.listing_id)
-  );
+export function activeNotificationsByListing() {
+  const rows = db
+    .prepare('SELECT listing_id, lead_seconds FROM notifications WHERE notified_at IS NULL')
+    .all();
+  const map = new Map();
+  for (const r of rows) {
+    if (!map.has(r.listing_id)) map.set(r.listing_id, new Set());
+    map.get(r.listing_id).add(r.lead_seconds);
+  }
+  return map;
 }
 
-export function listPendingNotifications({ leadSeconds = 3600 } = {}) {
+export function listPendingNotifications() {
   const nowSec = Math.floor(Date.now() / 1000);
   return db
     .prepare(
       `SELECT * FROM notifications
        WHERE notified_at IS NULL
          AND ends_at IS NOT NULL
-         AND ends_at - ? BETWEEN 0 AND ?
+         AND ends_at - ? BETWEEN 0 AND lead_seconds
        ORDER BY ends_at ASC`
     )
-    .all(nowSec, leadSeconds);
+    .all(nowSec);
 }
 
 export function markNotified(id, error = null) {

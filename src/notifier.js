@@ -7,7 +7,6 @@ import {
 import { toUsdCents, formatUsd, getCachedRates } from './currency.js';
 
 const WEBHOOK_URL = process.env.NOTIFY_WEBHOOK_URL;
-const LEAD_SECONDS = parseInt(process.env.NOTIFY_LEAD_SECONDS || '3600'); // 1h default
 const POLL_INTERVAL_MS = 60 * 1000; // check every 60s
 
 function enrichListing(n) {
@@ -56,7 +55,7 @@ async function fireWebhook(payload) {
 
 export async function runNotifier() {
   if (!WEBHOOK_URL) return { skipped: 'NOTIFY_WEBHOOK_URL not set' };
-  const pending = listPendingNotifications({ leadSeconds: LEAD_SECONDS });
+  const pending = listPendingNotifications();
   if (pending.length === 0) return { sent: 0, errors: 0 };
 
   let sent = 0;
@@ -65,7 +64,7 @@ export async function runNotifier() {
     const enriched = enrichListing(n);
     const payload = {
       type: 'auction_ending_soon',
-      lead_minutes: Math.round(LEAD_SECONDS / 60),
+      lead_minutes: Math.round(n.lead_seconds / 60),
       ...(enriched || {
         title: n.title,
         url: n.url,
@@ -103,7 +102,7 @@ export function startNotifier() {
     console.log('🔕 Notifier disabled — NOTIFY_WEBHOOK_URL not set');
     return;
   }
-  console.log(`🔔 Notifier polling every ${POLL_INTERVAL_MS / 1000}s (lead: ${LEAD_SECONDS / 60}min, webhook: ${WEBHOOK_URL.replace(/\?.*/, '').replace(/(:\/\/[^/]+).*/, '$1/…')})`);
+  console.log(`🔔 Notifier polling every ${POLL_INTERVAL_MS / 1000}s (per-notification leads, webhook: ${WEBHOOK_URL.replace(/\?.*/, '').replace(/(:\/\/[^/]+).*/, '$1/…')})`);
   intervalHandle = setInterval(() => {
     runNotifier().catch((e) => console.error('[notifier] Poll error:', e));
   }, POLL_INTERVAL_MS);

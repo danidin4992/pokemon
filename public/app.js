@@ -431,6 +431,26 @@ function renderMarketInline(bidCents, marketCents) {
   </div>`;
 }
 
+const NOTIFY_LEADS = [
+  { sec: 3600, label: '1h' },
+  { sec: 1800, label: '30m' },
+  { sec: 900, label: '15m' },
+  { sec: 300, label: '5m' },
+];
+
+function renderNotifyBox(l) {
+  const active = new Set(l.notify_leads || []);
+  const boxes = NOTIFY_LEADS.map((opt) => `
+    <label class="notify-opt">
+      <input type="checkbox" data-notify data-lead="${opt.sec}" ${active.has(opt.sec) ? 'checked' : ''}>
+      <span>${opt.label}</span>
+    </label>`).join('');
+  return `<div class="notify-box">
+    <div class="notify-heading">🔔 Notify</div>
+    ${boxes}
+  </div>`;
+}
+
 function renderListingRow(l) {
   const bidCents = l.price_usd_cents;
   const marketCents = l.search_pc_psa10_cents;
@@ -445,11 +465,8 @@ function renderListingRow(l) {
           <span class="search-badge">${escapeHtml(l.search_name)}</span>
           ${escapeHtml(l.condition || '')}${l.location ? ' · ' + escapeHtml(l.location) : ''}
         </div>
-        <label class="notify-toggle">
-          <input type="checkbox" data-notify ${l.notify_enabled ? 'checked' : ''}>
-          <span>🔔 Notify me 1h before end</span>
-        </label>
       </div>
+      ${renderNotifyBox(l)}
       <div class="price-block">
         <div class="price" title="${escapeHtml(l.price_text || '')}">${escapeHtml(bidCents != null ? fmtUsd(bidCents) : l.price_text || '—')}</div>
         ${renderMarketInline(bidCents, marketCents)}
@@ -549,17 +566,19 @@ $('#listings-list').addEventListener('change', async (e) => {
   if (!cb) return;
   const row = cb.closest('.listing');
   const listingId = row?.dataset?.listingId;
-  if (!listingId) return;
+  const lead = cb.dataset?.lead;
+  if (!listingId || !lead) return;
   const method = cb.checked ? 'POST' : 'DELETE';
   cb.disabled = true;
   try {
-    const res = await fetch(`/api/notify/${encodeURIComponent(listingId)}`, { method });
+    const res = await fetch(`/api/notify/${encodeURIComponent(listingId)}/${lead}`, { method });
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
       toast(j.error || 'Notify failed');
       cb.checked = !cb.checked;
     } else {
-      toast(cb.checked ? 'Will notify 1h before end' : 'Notify off');
+      const label = NOTIFY_LEADS.find((x) => x.sec === parseInt(lead))?.label;
+      toast(cb.checked ? `Will notify ${label} before end` : `${label} notify off`);
     }
   } catch (err) {
     toast('Network error');

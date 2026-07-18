@@ -17,7 +17,7 @@ import {
   setSetting,
   enableNotification,
   disableNotification,
-  activeNotificationListingIds,
+  activeNotificationsByListing,
   upsertPriceHistory,
   getPriceHistory,
 } from './db.js';
@@ -147,12 +147,15 @@ function filterListings(rows) {
 
 function annotateUsd(rows) {
   const rates = getCachedRates();
-  const notifiedIds = activeNotificationListingIds();
-  return rows.map((r) => ({
-    ...r,
-    price_usd_cents: toUsdCents(r.price_numeric, r.price_currency, rates),
-    notify_enabled: notifiedIds.has(r.listing_id),
-  }));
+  const notifyMap = activeNotificationsByListing();
+  return rows.map((r) => {
+    const leads = notifyMap.get(r.listing_id);
+    return {
+      ...r,
+      price_usd_cents: toUsdCents(r.price_numeric, r.price_currency, rates),
+      notify_leads: leads ? [...leads].sort((a, b) => a - b) : [],
+    };
+  });
 }
 
 app.get('/api/listings', (req, res) => {
@@ -164,8 +167,14 @@ app.get('/api/listings', (req, res) => {
   res.json(rows);
 });
 
-app.post('/api/notify/:listingId', (req, res) => {
+const ALLOWED_LEADS = new Set([300, 900, 1800, 3600]);
+
+app.post('/api/notify/:listingId/:leadSeconds', (req, res) => {
   const listingId = req.params.listingId;
+  const leadSeconds = parseInt(req.params.leadSeconds);
+  if (!ALLOWED_LEADS.has(leadSeconds)) {
+    return res.status(400).json({ error: 'lead_seconds must be one of 300, 900, 1800, 3600' });
+  }
   const listing = listListings({ activeOnly: false }).find(
     (l) => l.listing_id === listingId
   );
@@ -173,6 +182,7 @@ app.post('/api/notify/:listingId', (req, res) => {
   if (!listing.ends_at) return res.status(400).json({ error: 'listing has no end time' });
   enableNotification({
     listing_id: listing.listing_id,
+    lead_seconds: leadSeconds,
     search_id: listing.search_id,
     title: listing.title,
     url: listing.url,
@@ -181,8 +191,9 @@ app.post('/api/notify/:listingId', (req, res) => {
   res.json({ ok: true });
 });
 
-app.delete('/api/notify/:listingId', (req, res) => {
-  disableNotification(req.params.listingId);
+app.delete('/api/notify/:listingId/:leadSeconds', (req, res) => {
+  const leadSeconds = parseInt(req.params.leadSeconds);
+  disableNotification(req.params.listingId, leadSeconds);
   res.json({ ok: true });
 });
 
