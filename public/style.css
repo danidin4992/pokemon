@@ -360,6 +360,16 @@ h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; 
   font-weight: 500;
 }
 
+.listing .end-times {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #888;
+  font-weight: 500;
+}
+.listing .end-times .tz {
+  color: #555;
+}
+
 .listing .market-line {
   margin-top: 8px;
   padding-top: 6px;

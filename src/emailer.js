@@ -33,6 +33,24 @@ function fmtTimeLeft(l) {
   return `${h}h ${m}m`;
 }
 
+function fmtEndTimeInTz(endAtSec, tz) {
+  if (!endAtSec) return '';
+  const d = new Date(endAtSec * 1000);
+  const time = d.toLocaleTimeString('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false });
+  const nowDay = new Date().toLocaleDateString('en-CA', { timeZone: tz });
+  const endDay = d.toLocaleDateString('en-CA', { timeZone: tz });
+  if (nowDay === endDay) return time;
+  const weekday = d.toLocaleDateString('en-US', { timeZone: tz, weekday: 'short' });
+  return `${weekday} ${time}`;
+}
+
+function fmtEndTimes(endAtSec) {
+  if (!endAtSec) return '';
+  const il = fmtEndTimeInTz(endAtSec, 'Asia/Jerusalem');
+  const ny = fmtEndTimeInTz(endAtSec, 'America/New_York');
+  return `${il} IL · ${ny} NY`;
+}
+
 function escapeHtml(s) {
   if (s == null) return '';
   return String(s)
@@ -98,6 +116,7 @@ export function buildDigestHtml() {
           <div style="font-weight:700;font-size:14px" title="${escapeHtml(l.price_text || '')}">${escapeHtml(fmtPrice(l, rates))}</div>
           <div style="color:#666;margin-top:4px">${l.bid_count ?? 0} bids</div>
           <div style="color:#e53238;font-weight:600;margin-top:2px">${escapeHtml(fmtTimeLeft(l))}</div>
+          <div style="color:#888;font-size:11px;margin-top:2px">${escapeHtml(fmtEndTimes(l.ends_at))}</div>
           ${renderEmailDiff(toUsdCents(l.price_numeric, l.price_currency, rates), marketCents)}
         </td>
       </tr>`;

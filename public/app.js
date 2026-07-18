@@ -146,6 +146,24 @@ function fmtUsd(cents) {
   return '$' + dollars.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function fmtEndTimeInTz(endAtSec, tz) {
+  if (!endAtSec) return '';
+  const d = new Date(endAtSec * 1000);
+  const time = d.toLocaleTimeString('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false });
+  const nowDay = new Date().toLocaleDateString('en-CA', { timeZone: tz });
+  const endDay = d.toLocaleDateString('en-CA', { timeZone: tz });
+  if (nowDay === endDay) return time;
+  const weekday = d.toLocaleDateString('en-US', { timeZone: tz, weekday: 'short' });
+  return `${weekday} ${time}`;
+}
+
+function renderEndTimes(endAtSec) {
+  if (!endAtSec) return '';
+  const il = fmtEndTimeInTz(endAtSec, 'Asia/Jerusalem');
+  const ny = fmtEndTimeInTz(endAtSec, 'America/New_York');
+  return `<div class="end-times">Ends <span class="tz">${il} IL</span> · <span class="tz">${ny} NY</span></div>`;
+}
+
 function renderPcStrip(s) {
   if (!s.pricecharting_url) return '';
   const chips = `<span class="pc-tier psa10"><span class="label">PSA 10</span><span class="value">${escapeHtml(fmtMoney(s.pc_psa10_cents))}</span></span>`;
@@ -385,6 +403,7 @@ function renderListingRow(l) {
         <div class="price" title="${escapeHtml(l.price_text || '')}">${escapeHtml(bidCents != null ? fmtUsd(bidCents) : l.price_text || '—')}</div>
         <div class="bids">${l.bid_count ?? 0} bids</div>
         <div class="time-left">${fmtRelativeTime(l.ends_at)}</div>
+        ${renderEndTimes(l.ends_at)}
         ${renderMarketDiff(bidCents, marketCents)}
       </div>
     </div>`;
