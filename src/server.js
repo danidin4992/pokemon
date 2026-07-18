@@ -15,12 +15,16 @@ import {
   getLastRun,
   getSettings,
   setSetting,
+  enableNotification,
+  disableNotification,
+  activeNotificationListingIds,
 } from './db.js';
 import { runAllSearches } from './runner.js';
 import { sendDigest } from './emailer.js';
 import { fetchProductInfo } from './pricecharting.js';
 import { matchesListing } from './filters.js';
 import { toUsdCents, getCachedRates, refreshRatesIfStale } from './currency.js';
+import { startNotifier, runNotifier } from './notifier.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -135,9 +139,11 @@ function filterListings(rows) {
 
 function annotateUsd(rows) {
   const rates = getCachedRates();
+  const notifiedIds = activeNotificationListingIds();
   return rows.map((r) => ({
     ...r,
     price_usd_cents: toUsdCents(r.price_numeric, r.price_currency, rates),
+    notify_enabled: notifiedIds.has(r.listing_id),
   }));
 }
 
@@ -148,6 +154,37 @@ app.get('/api/listings', (req, res) => {
   if (!includeExcluded) rows = filterListings(rows);
   rows = annotateUsd(rows);
   res.json(rows);
+});
+
+app.post('/api/notify/:listingId', (req, res) => {
+  const listingId = req.params.listingId;
+  const listing = listListings({ activeOnly: false }).find(
+    (l) => l.listing_id === listingId
+  );
+  if (!listing) return res.status(404).json({ error: 'listing not found' });
+  if (!listing.ends_at) return res.status(400).json({ error: 'listing has no end time' });
+  enableNotification({
+    listing_id: listing.listing_id,
+    search_id: listing.search_id,
+    title: listing.title,
+    url: listing.url,
+    ends_at: listing.ends_at,
+  });
+  res.json({ ok: true });
+});
+
+app.delete('/api/notify/:listingId', (req, res) => {
+  disableNotification(req.params.listingId);
+  res.json({ ok: true });
+});
+
+app.post('/api/notify-now', async (req, res) => {
+  try {
+    const result = await runNotifier();
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.post('/api/refresh-rates', async (req, res) => {
@@ -270,4 +307,5 @@ const PORT = process.env.PORT || 3737;
 app.listen(PORT, () => {
   console.log(`🎴 pokemon-auctions server running at http://localhost:${PORT}`);
   if (AUTH_PASSWORD) console.log(`🔒 Basic Auth enabled (user: ${AUTH_USERNAME})`);
+  startNotifier();
 });

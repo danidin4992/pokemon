@@ -388,7 +388,7 @@ function renderListingRow(l) {
   const bidCents = l.price_usd_cents;
   const marketCents = l.search_pc_psa10_cents;
   return `
-    <div class="listing">
+    <div class="listing" data-listing-id="${escapeHtml(l.listing_id)}">
       <a href="${escapeHtml(l.url)}" target="_blank" rel="noopener">
         ${l.image_url ? `<img src="${escapeHtml(l.image_url)}" alt="">` : '<div style="width:80px;height:80px;background:#f0f0f0;border-radius:6px"></div>'}
       </a>
@@ -398,6 +398,10 @@ function renderListingRow(l) {
           <span class="search-badge">${escapeHtml(l.search_name)}</span>
           ${escapeHtml(l.condition || '')}${l.location ? ' · ' + escapeHtml(l.location) : ''}
         </div>
+        <label class="notify-toggle">
+          <input type="checkbox" data-notify ${l.notify_enabled ? 'checked' : ''}>
+          <span>🔔 Notify me 1h before end</span>
+        </label>
       </div>
       <div class="price-block">
         <div class="price" title="${escapeHtml(l.price_text || '')}">${escapeHtml(bidCents != null ? fmtUsd(bidCents) : l.price_text || '—')}</div>
@@ -491,6 +495,32 @@ $('#send-email').onclick = async () => {
 
 $('#filter-24h').onchange = renderListings;
 $('#filter-search').onchange = renderListings;
+
+// Delegate notify checkbox toggles for the whole listings list
+$('#listings-list').addEventListener('change', async (e) => {
+  const cb = e.target.closest('input[data-notify]');
+  if (!cb) return;
+  const row = cb.closest('.listing');
+  const listingId = row?.dataset?.listingId;
+  if (!listingId) return;
+  const method = cb.checked ? 'POST' : 'DELETE';
+  cb.disabled = true;
+  try {
+    const res = await fetch(`/api/notify/${encodeURIComponent(listingId)}`, { method });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      toast(j.error || 'Notify failed');
+      cb.checked = !cb.checked;
+    } else {
+      toast(cb.checked ? 'Will notify 1h before end' : 'Notify off');
+    }
+  } catch (err) {
+    toast('Network error');
+    cb.checked = !cb.checked;
+  } finally {
+    cb.disabled = false;
+  }
+});
 
 let globalRequiredTags;
 let globalForbiddenTags;

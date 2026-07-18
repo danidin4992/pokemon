@@ -61,6 +61,19 @@ db.exec(`
     value TEXT
   );
 
+  CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    listing_id TEXT NOT NULL UNIQUE,
+    search_id INTEGER,
+    title TEXT,
+    url TEXT,
+    ends_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+    notified_at INTEGER,
+    error TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_notifications_pending ON notifications(notified_at, ends_at);
+
   CREATE TABLE IF NOT EXISTS runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     started_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
@@ -320,6 +333,54 @@ export function getLastRun() {
   return db
     .prepare('SELECT * FROM runs ORDER BY id DESC LIMIT 1')
     .get();
+}
+
+export function enableNotification({ listing_id, search_id, title, url, ends_at }) {
+  if (!listing_id || !ends_at) return;
+  db.prepare(
+    `INSERT INTO notifications (listing_id, search_id, title, url, ends_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(listing_id) DO UPDATE SET
+       search_id = excluded.search_id,
+       title     = excluded.title,
+       url       = excluded.url,
+       ends_at   = excluded.ends_at`
+  ).run(listing_id, search_id ?? null, title ?? null, url ?? null, ends_at);
+}
+
+export function disableNotification(listing_id) {
+  // Only remove if not yet sent — keep history of sent ones for audit
+  db.prepare(
+    'DELETE FROM notifications WHERE listing_id = ? AND notified_at IS NULL'
+  ).run(listing_id);
+}
+
+export function activeNotificationListingIds() {
+  return new Set(
+    db
+      .prepare('SELECT listing_id FROM notifications WHERE notified_at IS NULL')
+      .all()
+      .map((r) => r.listing_id)
+  );
+}
+
+export function listPendingNotifications({ leadSeconds = 3600 } = {}) {
+  const nowSec = Math.floor(Date.now() / 1000);
+  return db
+    .prepare(
+      `SELECT * FROM notifications
+       WHERE notified_at IS NULL
+         AND ends_at IS NOT NULL
+         AND ends_at - ? BETWEEN 0 AND ?
+       ORDER BY ends_at ASC`
+    )
+    .all(nowSec, leadSeconds);
+}
+
+export function markNotified(id, error = null) {
+  db.prepare(
+    `UPDATE notifications SET notified_at = strftime('%s','now'), error = ? WHERE id = ?`
+  ).run(error, id);
 }
 
 if (process.argv.includes('--init')) {
