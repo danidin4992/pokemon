@@ -49,14 +49,19 @@ function fmtUsd(cents) {
   return d >= 1000 ? '$' + Math.round(d).toLocaleString('en-US') : '$' + d.toFixed(2);
 }
 
-function isNtfy(url) {
-  return /ntfy\.sh/i.test(url) || /\/api\/v\d+\//i.test(url) === false && /ntfy/i.test(url);
+function ntfyTopicFromUrl(url) {
+  // Detect ntfy.sh URLs and split into (root, topic).
+  const m = url.match(/^(https?:\/\/[^/]*ntfy\.sh)\/([^/?#]+)/i);
+  if (!m) return null;
+  return { root: m[1], topic: m[2] };
 }
 
-// Build a ntfy-shaped POST for the phone: readable body + headers for title,
-// priority, tags, and click-through URL. Falls back to generic JSON otherwise.
+// Build an ntfy JSON POST for the phone. Node's fetch requires ASCII headers,
+// so we can't put emoji in Title — using ntfy's JSON API instead means Unicode
+// (title, message, tags) all pass through cleanly.
 async function fireWebhook(payload) {
-  if (isNtfy(WEBHOOK_URL)) {
+  const ntfy = ntfyTopicFromUrl(WEBHOOK_URL);
+  if (ntfy) {
     const bidStr = fmtUsd(payload.current_bid_usd != null ? payload.current_bid_usd * 100 : null);
     const marketStr = fmtUsd(payload.psa10_market_usd != null ? payload.psa10_market_usd * 100 : null);
     const diffLine =
@@ -64,7 +69,7 @@ async function fireWebhook(payload) {
         ? `${payload.is_below_market ? '↓' : '↑'} ${payload.diff_pct > 0 ? '+' : ''}${payload.diff_pct}% vs PSA 10`
         : '';
     const bidsLine = payload.bids != null ? `${payload.bids} bids` : '';
-    const body = [
+    const message = [
       `Ends in ~${payload.ends_in_minutes}m`,
       `Bid ${bidStr}  ·  Market ${marketStr}`,
       [diffLine, bidsLine].filter(Boolean).join('  ·  '),
@@ -72,23 +77,30 @@ async function fireWebhook(payload) {
       .filter(Boolean)
       .join('\n');
 
-    const headers = {
-      Title: `🎴 ${payload.title?.substring(0, 90) || 'Pokemon auction'}`,
-      Priority: payload.lead_minutes <= 5 ? 'urgent' : 'high',
-      Tags: payload.is_below_market ? 'fire,rocket,green_circle' : 'bell,rocket,red_circle',
+    const body = {
+      topic: ntfy.topic,
+      title: `🎴 ${(payload.title || 'Pokemon auction').substring(0, 90)}`,
+      message,
+      priority: payload.lead_minutes <= 5 ? 5 : 4, // 5 = max, wakes screen
+      tags: payload.is_below_market
+        ? ['fire', 'rocket', 'green_circle']
+        : ['bell', 'rocket', 'red_circle'],
     };
-    if (payload.url) headers.Click = payload.url;
     if (payload.url) {
-      headers.Actions = `view, Open on eBay, ${payload.url}, clear=true`;
+      body.click = payload.url;
+      body.actions = [{ action: 'view', label: 'Open on eBay', url: payload.url, clear: true }];
     }
 
-    const res = await fetch(WEBHOOK_URL, {
+    const res = await fetch(ntfy.root, {
       method: 'POST',
-      headers,
-      body,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
       signal: AbortSignal.timeout(15000),
     });
-    if (!res.ok) throw new Error(`ntfy returned ${res.status} ${res.statusText}`);
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`ntfy returned ${res.status} ${res.statusText} — ${text.substring(0, 200)}`);
+    }
     return;
   }
 
