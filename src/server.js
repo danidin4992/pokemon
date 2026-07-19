@@ -34,7 +34,7 @@ import { sendDigest } from './emailer.js';
 import { fetchProductInfo } from './pricecharting.js';
 import { matchesListing } from './filters.js';
 import { toUsdCents, getCachedRates, refreshRatesIfStale } from './currency.js';
-import { startNotifier, runNotifier } from './notifier.js';
+import { startNotifier, runNotifier, getRecipients } from './notifier.js';
 import { startHotPoller, getActivePollListingIds } from './hotpoller.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -159,15 +159,28 @@ function annotateUsd(rows) {
   const notifyMap = activeNotificationsByListing();
   const hotIds = activeHotListingIds();
   return rows.map((r) => {
-    const leads = notifyMap.get(r.listing_id);
+    const perRecipient = notifyMap.get(r.listing_id);
+    const notifyByRecipient = {};
+    if (perRecipient) {
+      for (const [rec, leads] of perRecipient) {
+        notifyByRecipient[rec] = [...leads].sort((a, b) => a - b);
+      }
+    }
     return {
       ...r,
       price_usd_cents: toUsdCents(r.price_numeric, r.price_currency, rates),
-      notify_leads: leads ? [...leads].sort((a, b) => a - b) : [],
+      notify_by_recipient: notifyByRecipient,
       is_hot: hotIds.has(r.listing_id),
     };
   });
 }
+
+app.get('/api/recipients', (req, res) => {
+  const recipients = getRecipients();
+  res.json(
+    Object.values(recipients).map((r) => ({ key: r.key, label: r.label }))
+  );
+});
 
 app.get('/api/listings', (req, res) => {
   const searchId = req.query.search_id ? parseInt(req.query.search_id) : null;
@@ -180,12 +193,24 @@ app.get('/api/listings', (req, res) => {
 
 const ALLOWED_LEADS = new Set([300, 900, 1800, 3600]);
 
+function validateRecipient(req, res) {
+  const rec = req.query.recipient || req.body?.recipient || 'daniel';
+  const recipients = getRecipients();
+  if (!recipients[rec]) {
+    res.status(400).json({ error: `unknown recipient "${rec}". known: ${Object.keys(recipients).join(', ')}` });
+    return null;
+  }
+  return rec;
+}
+
 app.post('/api/notify/:listingId/:leadSeconds', (req, res) => {
   const listingId = req.params.listingId;
   const leadSeconds = parseInt(req.params.leadSeconds);
   if (!ALLOWED_LEADS.has(leadSeconds)) {
     return res.status(400).json({ error: 'lead_seconds must be one of 300, 900, 1800, 3600' });
   }
+  const recipient = validateRecipient(req, res);
+  if (!recipient) return;
   const listing = listListings({ activeOnly: false }).find(
     (l) => l.listing_id === listingId
   );
@@ -194,18 +219,21 @@ app.post('/api/notify/:listingId/:leadSeconds', (req, res) => {
   enableNotification({
     listing_id: listing.listing_id,
     lead_seconds: leadSeconds,
+    recipient,
     search_id: listing.search_id,
     title: listing.title,
     url: listing.url,
     ends_at: listing.ends_at,
   });
-  res.json({ ok: true });
+  res.json({ ok: true, recipient });
 });
 
 app.delete('/api/notify/:listingId/:leadSeconds', (req, res) => {
   const leadSeconds = parseInt(req.params.leadSeconds);
-  disableNotification(req.params.listingId, leadSeconds);
-  res.json({ ok: true });
+  const recipient = validateRecipient(req, res);
+  if (!recipient) return;
+  disableNotification(req.params.listingId, leadSeconds, recipient);
+  res.json({ ok: true, recipient });
 });
 
 app.post('/api/notify-now', async (req, res) => {

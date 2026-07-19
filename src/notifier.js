@@ -6,8 +6,35 @@ import {
 } from './db.js';
 import { toUsdCents, formatUsd, getCachedRates } from './currency.js';
 
-const WEBHOOK_URL = process.env.NOTIFY_WEBHOOK_URL;
 const POLL_INTERVAL_MS = 60 * 1000; // check every 60s
+
+// Load recipient config. Falls back to legacy single-recipient env var so
+// existing deploys keep working: NOTIFY_WEBHOOK_URL → recipient "daniel".
+function loadRecipients() {
+  const raw = process.env.NOTIFY_RECIPIENTS;
+  if (raw) {
+    try {
+      const arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) throw new Error('not an array');
+      const map = {};
+      for (const r of arr) {
+        if (!r.key || !r.webhook) continue;
+        map[r.key] = { key: r.key, label: r.label || r.key, webhook: r.webhook };
+      }
+      return map;
+    } catch (e) {
+      console.error('NOTIFY_RECIPIENTS parse failed:', e.message);
+    }
+  }
+  const single = process.env.NOTIFY_WEBHOOK_URL;
+  if (single) {
+    return { daniel: { key: 'daniel', label: 'Daniel', webhook: single } };
+  }
+  return {};
+}
+
+const RECIPIENTS = loadRecipients();
+export function getRecipients() { return RECIPIENTS; }
 
 function enrichListing(n) {
   // Look up the current listing row to include live bid + market data
@@ -59,7 +86,8 @@ function ntfyTopicFromUrl(url) {
 // Build an ntfy JSON POST for the phone. Node's fetch requires ASCII headers,
 // so we can't put emoji in Title — using ntfy's JSON API instead means Unicode
 // (title, message, tags) all pass through cleanly.
-async function fireWebhook(payload) {
+async function fireWebhook(payload, webhookUrl) {
+  const WEBHOOK_URL = webhookUrl;
   const ntfy = ntfyTopicFromUrl(WEBHOOK_URL);
   if (ntfy) {
     const bidStr = fmtUsd(payload.current_bid_usd != null ? payload.current_bid_usd * 100 : null);
@@ -115,13 +143,20 @@ async function fireWebhook(payload) {
 }
 
 export async function runNotifier() {
-  if (!WEBHOOK_URL) return { skipped: 'NOTIFY_WEBHOOK_URL not set' };
+  if (Object.keys(RECIPIENTS).length === 0) return { skipped: 'no recipients configured' };
   const pending = listPendingNotifications();
   if (pending.length === 0) return { sent: 0, errors: 0 };
 
   let sent = 0;
   let errors = 0;
   for (const n of pending) {
+    const recipient = RECIPIENTS[n.recipient];
+    if (!recipient) {
+      console.error(`[notifier] Unknown recipient "${n.recipient}" for listing ${n.listing_id} — skipping`);
+      markNotified(n.id, `unknown recipient: ${n.recipient}`);
+      errors++;
+      continue;
+    }
     const enriched = enrichListing(n);
     const payload = {
       type: 'auction_ending_soon',
@@ -136,10 +171,10 @@ export async function runNotifier() {
     };
 
     try {
-      await fireWebhook(payload);
+      await fireWebhook(payload, recipient.webhook);
       markNotified(n.id);
       sent++;
-      console.log(`[notifier] Sent for ${payload.title?.substring(0, 40)} (ends in ${payload.ends_in_minutes}m)`);
+      console.log(`[notifier] Sent to ${recipient.label} for ${payload.title?.substring(0, 40)} (ends in ${payload.ends_in_minutes}m)`);
     } catch (err) {
       // Mark with error so we don't retry forever — we'll try again NEXT poll
       // but stop retrying after ends_at has passed
@@ -159,11 +194,12 @@ export async function runNotifier() {
 let intervalHandle = null;
 export function startNotifier() {
   if (intervalHandle) return;
-  if (!WEBHOOK_URL) {
-    console.log('🔕 Notifier disabled — NOTIFY_WEBHOOK_URL not set');
+  const keys = Object.keys(RECIPIENTS);
+  if (keys.length === 0) {
+    console.log('🔕 Notifier disabled — no NOTIFY_RECIPIENTS / NOTIFY_WEBHOOK_URL set');
     return;
   }
-  console.log(`🔔 Notifier polling every ${POLL_INTERVAL_MS / 1000}s (per-notification leads, webhook: ${WEBHOOK_URL.replace(/\?.*/, '').replace(/(:\/\/[^/]+).*/, '$1/…')})`);
+  console.log(`🔔 Notifier polling every ${POLL_INTERVAL_MS / 1000}s for ${keys.length} recipient(s): ${keys.join(', ')}`);
   intervalHandle = setInterval(() => {
     runNotifier().catch((e) => console.error('[notifier] Poll error:', e));
   }, POLL_INTERVAL_MS);

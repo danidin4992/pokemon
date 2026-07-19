@@ -153,6 +153,7 @@ function migrate() {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         listing_id TEXT NOT NULL,
         lead_seconds INTEGER NOT NULL DEFAULT 3600,
+        recipient TEXT NOT NULL DEFAULT 'daniel',
         search_id INTEGER,
         title TEXT,
         url TEXT,
@@ -160,11 +161,38 @@ function migrate() {
         created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
         notified_at INTEGER,
         error TEXT,
-        UNIQUE(listing_id, lead_seconds)
+        UNIQUE(listing_id, lead_seconds, recipient)
       );
       INSERT INTO notifications
-        (listing_id, lead_seconds, search_id, title, url, ends_at, created_at, notified_at, error)
-      SELECT listing_id, 3600, search_id, title, url, ends_at, created_at, notified_at, error
+        (listing_id, lead_seconds, recipient, search_id, title, url, ends_at, created_at, notified_at, error)
+      SELECT listing_id, 3600, 'daniel', search_id, title, url, ends_at, created_at, notified_at, error
+      FROM _notifications_old;
+      DROP TABLE _notifications_old;
+      CREATE INDEX IF NOT EXISTS idx_notifications_pending ON notifications(notified_at, ends_at);
+    `);
+  }
+  // Second migration: add recipient to a table that already has lead_seconds
+  // (fresh 32-migration deploys) but not yet recipient (33 migration).
+  if (notifCols.length && notifCols.includes('lead_seconds') && !notifCols.includes('recipient')) {
+    db.exec(`
+      ALTER TABLE notifications RENAME TO _notifications_old;
+      CREATE TABLE notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        listing_id TEXT NOT NULL,
+        lead_seconds INTEGER NOT NULL DEFAULT 3600,
+        recipient TEXT NOT NULL DEFAULT 'daniel',
+        search_id INTEGER,
+        title TEXT,
+        url TEXT,
+        ends_at INTEGER NOT NULL,
+        created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+        notified_at INTEGER,
+        error TEXT,
+        UNIQUE(listing_id, lead_seconds, recipient)
+      );
+      INSERT INTO notifications
+        (listing_id, lead_seconds, recipient, search_id, title, url, ends_at, created_at, notified_at, error)
+      SELECT listing_id, lead_seconds, 'daniel', search_id, title, url, ends_at, created_at, notified_at, error
       FROM _notifications_old;
       DROP TABLE _notifications_old;
       CREATE INDEX IF NOT EXISTS idx_notifications_pending ON notifications(notified_at, ends_at);
@@ -476,41 +504,48 @@ export function searchIdsWithHotOrEndingSoon(hoursAhead = 24) {
   return rows.map((r) => r.id);
 }
 
-export function enableNotification({ listing_id, lead_seconds, search_id, title, url, ends_at }) {
+export function enableNotification({ listing_id, lead_seconds, recipient, search_id, title, url, ends_at }) {
   if (!listing_id || !ends_at || !lead_seconds) return;
+  const rec = recipient || 'daniel';
   db.prepare(
-    `INSERT INTO notifications (listing_id, lead_seconds, search_id, title, url, ends_at)
-     VALUES (?, ?, ?, ?, ?, ?)
-     ON CONFLICT(listing_id, lead_seconds) DO UPDATE SET
+    `INSERT INTO notifications (listing_id, lead_seconds, recipient, search_id, title, url, ends_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(listing_id, lead_seconds, recipient) DO UPDATE SET
        search_id = excluded.search_id,
        title     = excluded.title,
        url       = excluded.url,
        ends_at   = excluded.ends_at`
-  ).run(listing_id, lead_seconds, search_id ?? null, title ?? null, url ?? null, ends_at);
+  ).run(listing_id, lead_seconds, rec, search_id ?? null, title ?? null, url ?? null, ends_at);
 }
 
-export function disableNotification(listing_id, lead_seconds) {
-  // Only remove if not yet sent — keep history of sent ones for audit
-  if (lead_seconds) {
+export function disableNotification(listing_id, lead_seconds, recipient) {
+  const rec = recipient || null;
+  if (lead_seconds && rec) {
+    db.prepare(
+      'DELETE FROM notifications WHERE listing_id = ? AND lead_seconds = ? AND recipient = ? AND notified_at IS NULL'
+    ).run(listing_id, lead_seconds, rec);
+  } else if (lead_seconds) {
     db.prepare(
       'DELETE FROM notifications WHERE listing_id = ? AND lead_seconds = ? AND notified_at IS NULL'
     ).run(listing_id, lead_seconds);
   } else {
-    // disable all pending leads for a listing
     db.prepare(
       'DELETE FROM notifications WHERE listing_id = ? AND notified_at IS NULL'
     ).run(listing_id);
   }
 }
 
+// Map of listing_id → Map of recipient → Set of lead_seconds
 export function activeNotificationsByListing() {
   const rows = db
-    .prepare('SELECT listing_id, lead_seconds FROM notifications WHERE notified_at IS NULL')
+    .prepare('SELECT listing_id, lead_seconds, recipient FROM notifications WHERE notified_at IS NULL')
     .all();
   const map = new Map();
   for (const r of rows) {
-    if (!map.has(r.listing_id)) map.set(r.listing_id, new Set());
-    map.get(r.listing_id).add(r.lead_seconds);
+    if (!map.has(r.listing_id)) map.set(r.listing_id, new Map());
+    const byRecipient = map.get(r.listing_id);
+    if (!byRecipient.has(r.recipient)) byRecipient.set(r.recipient, new Set());
+    byRecipient.get(r.recipient).add(r.lead_seconds);
   }
   return map;
 }

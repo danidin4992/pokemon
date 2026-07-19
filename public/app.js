@@ -3,6 +3,8 @@ const $ = (s) => document.querySelector(s);
 let searches = [];
 let listings = [];
 let settings = { global_required_keywords: [], global_forbidden_keywords: [] };
+let recipients = [];
+let currentRecipient = localStorage.getItem('pokemon-recipient') || 'daniel';
 const editingSearchId = new Set();
 
 function parseCsv(v) {
@@ -494,14 +496,30 @@ const NOTIFY_LEADS = [
 ];
 
 function renderNotifyBox(l) {
-  const active = new Set(l.notify_leads || []);
-  const boxes = NOTIFY_LEADS.map((opt) => `
-    <label class="notify-opt">
-      <input type="checkbox" data-notify data-lead="${opt.sec}" ${active.has(opt.sec) ? 'checked' : ''}>
-      <span>${opt.label}</span>
-    </label>`).join('');
+  const byRecipient = l.notify_by_recipient || {};
+  const mine = new Set(byRecipient[currentRecipient] || []);
+  const otherRecipientLeads = new Map();
+  for (const [rec, leads] of Object.entries(byRecipient)) {
+    if (rec !== currentRecipient) {
+      for (const lead of leads) {
+        if (!otherRecipientLeads.has(lead)) otherRecipientLeads.set(lead, []);
+        otherRecipientLeads.get(lead).push(rec);
+      }
+    }
+  }
+  const recipientLabelMap = Object.fromEntries(recipients.map((r) => [r.key, r.label]));
+  const boxes = NOTIFY_LEADS.map((opt) => {
+    const others = otherRecipientLeads.get(opt.sec) || [];
+    const otherBadge = others.length
+      ? `<span class="notify-other-badge" title="${others.map(r=>recipientLabelMap[r]||r).join(', ')} also notified">${others.map(r=>(recipientLabelMap[r]||r).charAt(0)).join('')}</span>`
+      : '';
+    return `<label class="notify-opt">
+      <input type="checkbox" data-notify data-lead="${opt.sec}" ${mine.has(opt.sec) ? 'checked' : ''}>
+      <span>${opt.label}</span>${otherBadge}
+    </label>`;
+  }).join('');
   return `<div class="notify-box">
-    <div class="notify-heading">🔔 Notify</div>
+    <div class="notify-heading">🔔 Notify <span class="notify-me">${escapeHtml(recipientLabelMap[currentRecipient] || currentRecipient)}</span></div>
     ${boxes}
     <button type="button" class="hot-btn ${l.is_hot ? 'active' : ''}" data-hot title="Track this listing intensively">
       ${l.is_hot ? '🔥 Watching' : '🔥 Watch'}
@@ -731,14 +749,19 @@ $('#listings-list').addEventListener('change', async (e) => {
   const method = cb.checked ? 'POST' : 'DELETE';
   cb.disabled = true;
   try {
-    const res = await fetch(`/api/notify/${encodeURIComponent(listingId)}/${lead}`, { method });
+    const res = await fetch(
+      `/api/notify/${encodeURIComponent(listingId)}/${lead}?recipient=${encodeURIComponent(currentRecipient)}`,
+      { method }
+    );
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
       toast(j.error || 'Notify failed');
       cb.checked = !cb.checked;
     } else {
       const label = NOTIFY_LEADS.find((x) => x.sec === parseInt(lead))?.label;
-      toast(cb.checked ? `Will notify ${label} before end` : `${label} notify off`);
+      const me = recipients.find((r) => r.key === currentRecipient)?.label || currentRecipient;
+      toast(cb.checked ? `Will notify ${me} ${label} before end` : `${label} notify off for ${me}`);
+      await loadListings();
     }
   } catch (err) {
     toast('Network error');
@@ -778,6 +801,41 @@ $('#listings-list').addEventListener('click', async (e) => {
 
 let globalRequiredTags;
 let globalForbiddenTags;
+
+async function loadRecipients() {
+  try {
+    const res = await fetch('/api/recipients');
+    recipients = await res.json();
+  } catch {
+    recipients = [{ key: 'daniel', label: 'Daniel' }];
+  }
+  if (!recipients.find((r) => r.key === currentRecipient) && recipients.length) {
+    currentRecipient = recipients[0].key;
+    localStorage.setItem('pokemon-recipient', currentRecipient);
+  }
+  renderRecipientPicker();
+}
+
+function renderRecipientPicker() {
+  const el = $('#recipient-picker');
+  if (!el) return;
+  if (recipients.length <= 1) {
+    el.innerHTML = '';
+    return;
+  }
+  el.innerHTML = `<span class="rp-label">I'm:</span>` +
+    recipients.map((r) => `
+      <button type="button" class="rp-btn ${r.key === currentRecipient ? 'active' : ''}" data-recipient="${escapeHtml(r.key)}">${escapeHtml(r.label)}</button>
+    `).join('');
+  el.querySelectorAll('[data-recipient]').forEach((btn) => {
+    btn.onclick = () => {
+      currentRecipient = btn.dataset.recipient;
+      localStorage.setItem('pokemon-recipient', currentRecipient);
+      renderRecipientPicker();
+      renderListings();
+    };
+  });
+}
 
 async function loadSettings() {
   const res = await fetch('/api/settings');
@@ -823,6 +881,7 @@ $('#save-settings').onclick = async () => {
   }
 };
 
+loadRecipients();
 loadSettings();
 loadSearches();
 loadListings();
