@@ -225,3 +225,96 @@ export async function scrapeSearch(url) {
   const html = await fetchSearchPage(url);
   return parseListings(html);
 }
+
+async function curlItemPage(url) {
+  const args = [
+    '-sSL', '--compressed', '--max-time', '15',
+    '-b', COOKIE_JAR, '-c', COOKIE_JAR,
+    '-H', 'Sec-Fetch-Site: same-origin',
+    '-H', 'Sec-Fetch-User: ?1',
+    '-H', 'Referer: https://www.ebay.com/',
+  ];
+  for (const h of BASE_HEADERS) args.push('-H', h);
+  args.push(url);
+  const { stdout } = await execFileP('curl', args, { maxBuffer: 10 * 1024 * 1024 });
+  return stdout;
+}
+
+export function parseItemPage(html) {
+  if (!html || html.length < 5000) throw new Error(`Item page too short (${html?.length}) — likely blocked`);
+
+  // Current bid — eBay embeds a JSON blob with both localized and USD values.
+  // Prefer the USD original since the localized one depends on visitor geo.
+  let bidUsdCents = null;
+  let priceText = null;
+  let priceCurrency = null;
+  let priceNumeric = null;
+  const priceMatch = html.match(/"currentBidPrice"\s*:\s*({[^}]+})/);
+  if (priceMatch) {
+    try {
+      const obj = JSON.parse(priceMatch[1]);
+      priceCurrency = obj.currency || null;
+      priceNumeric = typeof obj.value === 'number' ? obj.value : null;
+      priceText = obj.currency && obj.value != null ? `${obj.currency} ${obj.value}` : null;
+      if (obj.convertedFromCurrency === 'USD' && typeof obj.convertedFromValue === 'number') {
+        bidUsdCents = Math.round(obj.convertedFromValue * 100);
+      } else if (obj.currency === 'USD' && typeof obj.value === 'number') {
+        bidUsdCents = Math.round(obj.value * 100);
+      }
+    } catch {}
+  }
+
+  // Fallback: Buy-It-Now (no bid, fixed price) — skip if only interested in auctions
+  if (bidUsdCents == null) {
+    const bin = html.match(/"binPrice"\s*:\s*({[^}]+})/);
+    if (bin) {
+      try {
+        const obj = JSON.parse(bin[1]);
+        if (obj.convertedFromCurrency === 'USD') bidUsdCents = Math.round(obj.convertedFromValue * 100);
+        else if (obj.currency === 'USD') bidUsdCents = Math.round(obj.value * 100);
+        priceText = obj.currency && obj.value != null ? `${obj.currency} ${obj.value}` : priceText;
+      } catch {}
+    }
+  }
+
+  // Bid count — "N bids" text inside x-bid-count. The <a> tag between
+  // has ~800 chars of data-attrs so we allow up to 1500.
+  let bidCount = null;
+  const bcMatch = html.match(/data-testid=x-bid-count[\s\S]{0,1500}?>(\d+)\s+bids?/i);
+  if (bcMatch) bidCount = parseInt(bcMatch[1]);
+
+  // End time — ISO 8601 in the TimerModel JSON
+  let endsAt = null;
+  const endMatch = html.match(/"endTime"\s*:\s*\{[^{}]*"endTime"\s*:\s*\{[^{}]*"value"\s*:\s*"([^"]+)/);
+  if (endMatch) endsAt = Math.floor(new Date(endMatch[1]).getTime() / 1000);
+
+  // Title (fallback / verification)
+  const titleMatch = html.match(/<title>([^<]+?)\s*\|\s*eBay<\/title>/);
+  const title = titleMatch ? titleMatch[1].trim() : null;
+
+  return {
+    bid_usd_cents: bidUsdCents,
+    bid_count: bidCount,
+    ends_at: endsAt,
+    price_text: priceText,
+    price_currency: priceCurrency,
+    price_numeric: priceNumeric,
+    title,
+  };
+}
+
+export async function fetchItemPage(itemId) {
+  if (!/^\d+$/.test(String(itemId))) throw new Error('itemId must be numeric');
+  if (!isFreshCookieJar()) await warmupSession();
+  const url = `https://www.ebay.com/itm/${itemId}`;
+  const html = await curlItemPage(url);
+  if (html.includes('Error Page | eBay') || html.length < 5000) {
+    await warmupSession();
+    const retry = await curlItemPage(url);
+    if (retry.includes('Error Page | eBay') || retry.length < 5000) {
+      throw new Error(`Item page blocked (${retry.length} bytes)`);
+    }
+    return parseItemPage(retry);
+  }
+  return parseItemPage(html);
+}

@@ -92,6 +92,19 @@ db.exec(`
     added_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
   );
 
+  CREATE TABLE IF NOT EXISTS hot_polls (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    listing_id TEXT NOT NULL,
+    ts_ms INTEGER NOT NULL,
+    bid_usd_cents INTEGER,
+    bid_count INTEGER,
+    price_text TEXT,
+    ends_at INTEGER,
+    source TEXT,
+    error TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_hot_polls_listing ON hot_polls(listing_id, ts_ms);
+
   CREATE TABLE IF NOT EXISTS runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     started_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
@@ -412,6 +425,40 @@ export function activeHotListingIds() {
 
 export function listHotListings() {
   return db.prepare('SELECT * FROM hot_listings ORDER BY added_at DESC').all();
+}
+
+const insertHotPollStmt = db.prepare(
+  `INSERT INTO hot_polls (listing_id, ts_ms, bid_usd_cents, bid_count, price_text, ends_at, source, error)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+);
+
+export function insertHotPoll({ listing_id, ts_ms, bid_usd_cents, bid_count, price_text, ends_at, source, error }) {
+  insertHotPollStmt.run(
+    listing_id,
+    ts_ms,
+    bid_usd_cents ?? null,
+    bid_count ?? null,
+    price_text ?? null,
+    ends_at ?? null,
+    source ?? null,
+    error ?? null
+  );
+}
+
+export function getHotPollTimeline(listing_id, sinceMs = 0) {
+  return db
+    .prepare(
+      `SELECT ts_ms, bid_usd_cents, bid_count, price_text, error
+       FROM hot_polls
+       WHERE listing_id = ? AND ts_ms > ?
+       ORDER BY ts_ms ASC`
+    )
+    .all(listing_id, sinceMs);
+}
+
+export function pruneOldHotPolls(olderThanSec = 3600) {
+  const cutoff = Date.now() - olderThanSec * 1000;
+  db.prepare('DELETE FROM hot_polls WHERE ts_ms < ?').run(cutoff);
 }
 
 export function searchIdsWithHotOrEndingSoon(hoursAhead = 24) {

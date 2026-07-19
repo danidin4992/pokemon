@@ -437,6 +437,39 @@ h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; 
   background: linear-gradient(90deg, #fff9f2 0%, white 40%);
   border-left: 3px solid #ff6b35;
 }
+
+.listing.in-window {
+  background: linear-gradient(90deg, #fff5eb 0%, #fffaf3 40%);
+  border-left: 4px solid #ff3d00;
+  animation: hot-pulse 1.5s ease-in-out infinite;
+}
+@keyframes hot-pulse {
+  0%, 100% { box-shadow: inset 3px 0 0 rgba(255, 61, 0, 0); }
+  50%      { box-shadow: inset 3px 0 0 rgba(255, 61, 0, 0.3); }
+}
+
+.listing .live-status {
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #666;
+}
+.listing .live-status.live {
+  color: #ff3d00;
+  animation: dot-blink 1s ease-in-out infinite;
+}
+@keyframes dot-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+
+.listing .price.flash {
+  animation: price-flash 0.6s ease-out;
+}
+@keyframes price-flash {
+  0%   { background: #fff59d; }
+  100% { background: transparent; }
+}
 .listing .end-times .tz {
   color: #555;
 }

@@ -512,8 +512,9 @@ function renderNotifyBox(l) {
 function renderListingRow(l) {
   const bidCents = l.price_usd_cents;
   const marketCents = l.search_pc_psa10_cents;
+  const inWindow = l.is_hot && l.ends_at && (l.ends_at - Math.floor(Date.now() / 1000)) <= 60;
   return `
-    <div class="listing ${l.is_hot ? 'is-hot' : ''}" data-listing-id="${escapeHtml(l.listing_id)}">
+    <div class="listing ${l.is_hot ? 'is-hot' : ''} ${inWindow ? 'in-window' : ''}" data-listing-id="${escapeHtml(l.listing_id)}" data-ends-at="${l.ends_at || ''}">
       <a href="${escapeHtml(l.url)}" target="_blank" rel="noopener">
         ${l.image_url ? `<img src="${escapeHtml(l.image_url)}" alt="">` : '<div style="width:80px;height:80px;background:#f0f0f0;border-radius:6px"></div>'}
       </a>
@@ -526,14 +527,114 @@ function renderListingRow(l) {
       </div>
       ${renderNotifyBox(l)}
       <div class="price-block">
-        <div class="price" title="${escapeHtml(l.price_text || '')}">${escapeHtml(bidCents != null ? fmtUsd(bidCents) : l.price_text || '—')}</div>
+        <div class="price" title="${escapeHtml(l.price_text || '')}" data-role="bid">${escapeHtml(bidCents != null ? fmtUsd(bidCents) : l.price_text || '—')}</div>
         ${renderMarketInline(bidCents, marketCents)}
-        <div class="bids">${l.bid_count ?? 0} bids</div>
-        <div class="time-left">${fmtRelativeTime(l.ends_at)}</div>
+        <div class="bids" data-role="bids">${l.bid_count ?? 0} bids</div>
+        <div class="time-left" data-role="time-left">${fmtRelativeTime(l.ends_at)}</div>
         ${renderEndTimes(l.ends_at)}
+        ${l.is_hot ? `<div class="live-status" data-role="live-status"></div>` : ''}
       </div>
     </div>`;
 }
+
+// ================== Live view for hot listings in the final window ==================
+const liveTimelines = new Map(); // listing_id -> { lastTs, interval }
+
+async function pollLiveTimeline(listingId, row) {
+  const state = liveTimelines.get(listingId) || { lastTs: 0 };
+  try {
+    const res = await fetch(`/api/hot/${encodeURIComponent(listingId)}/timeline?since=${state.lastTs}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.polls && data.polls.length) {
+      const latest = data.polls[data.polls.length - 1];
+      state.lastTs = latest.ts_ms;
+      liveTimelines.set(listingId, state);
+      // Update the row's price and bid count with the freshest values
+      const priceEl = row.querySelector('[data-role="bid"]');
+      const bidsEl = row.querySelector('[data-role="bids"]');
+      const timeLeftEl = row.querySelector('[data-role="time-left"]');
+      const statusEl = row.querySelector('[data-role="live-status"]');
+      if (priceEl && latest.bid_usd_cents != null) {
+        const oldText = priceEl.textContent;
+        priceEl.textContent = fmtUsd(latest.bid_usd_cents);
+        if (oldText !== priceEl.textContent) {
+          priceEl.classList.remove('flash');
+          void priceEl.offsetWidth;
+          priceEl.classList.add('flash');
+        }
+      }
+      if (bidsEl && latest.bid_count != null) bidsEl.textContent = `${latest.bid_count} bids`;
+      if (timeLeftEl && row.dataset.endsAt) {
+        const endsAt = parseInt(row.dataset.endsAt);
+        const remaining = endsAt - Math.floor(Date.now() / 1000);
+        timeLeftEl.textContent = remaining > 0 ? fmtRelativeTime(endsAt) : 'ended';
+      }
+      if (statusEl) {
+        const cadence = data.is_polling ? 'live' : 'idle';
+        statusEl.textContent = `● ${cadence} · ${data.polls.length} pings`;
+        statusEl.className = `live-status ${cadence}`;
+      }
+    } else if (data.is_polling) {
+      const statusEl = row.querySelector('[data-role="live-status"]');
+      if (statusEl) {
+        statusEl.textContent = '● connecting…';
+        statusEl.className = 'live-status live';
+      }
+    }
+  } catch {}
+}
+
+function scanForWindowedListings() {
+  const now = Math.floor(Date.now() / 1000);
+  const rows = document.querySelectorAll('.listing.is-hot');
+  const activeIds = new Set();
+  rows.forEach((row) => {
+    const endsAt = parseInt(row.dataset.endsAt);
+    if (!endsAt) return;
+    const remaining = endsAt - now;
+    if (remaining <= 60 && remaining > -10) {
+      row.classList.add('in-window');
+      activeIds.add(row.dataset.listingId);
+    } else {
+      row.classList.remove('in-window');
+    }
+    // Live countdown for all hot rows so seconds tick down without a full re-render
+    const timeLeftEl = row.querySelector('[data-role="time-left"]');
+    if (timeLeftEl && remaining > -10) {
+      if (remaining > 0) {
+        const h = Math.floor(remaining / 3600);
+        const m = Math.floor((remaining % 3600) / 60);
+        const s = remaining % 60;
+        timeLeftEl.textContent = h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${s}s` : `${s}s`;
+      } else {
+        timeLeftEl.textContent = 'ended';
+      }
+    }
+  });
+
+  // Start pollers for listings that entered the window
+  for (const id of activeIds) {
+    if (liveTimelines.has(id)) continue;
+    const row = document.querySelector(`.listing[data-listing-id="${CSS.escape(id)}"]`);
+    if (!row) continue;
+    const state = { lastTs: 0, interval: null };
+    state.interval = setInterval(() => pollLiveTimeline(id, row), 500);
+    liveTimelines.set(id, state);
+    pollLiveTimeline(id, row); // immediate first fetch
+  }
+
+  // Stop pollers for listings that left the window (ended)
+  for (const [id, state] of liveTimelines) {
+    if (!activeIds.has(id)) {
+      clearInterval(state.interval);
+      liveTimelines.delete(id);
+    }
+  }
+}
+
+// Scan every second — the "hot window" starts at 60s remaining
+setInterval(scanForWindowedListings, 1000);
 
 async function loadLastRun() {
   const res = await fetch('/api/last-run');

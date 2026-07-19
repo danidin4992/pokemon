@@ -12,15 +12,15 @@
  *   EBAY_API_TOKEN present + EBAY_DATA_SOURCE=api → API
  *   otherwise                                     → scrape (default)
  */
-import { scrapeSearch } from './scraper.js';
+import { scrapeSearch, fetchItemPage } from './scraper.js';
 
 export const scrapeDataSource = {
   name: 'scrape',
   async listBySearchUrl(url) {
     return await scrapeSearch(url);
   },
-  async listByItemId(_itemId) {
-    throw new Error('Per-item polling requires the eBay API — enable EBAY_API_TOKEN');
+  async listByItemId(itemId) {
+    return await fetchItemPage(itemId);
   },
 };
 

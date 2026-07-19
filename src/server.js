@@ -26,6 +26,8 @@ import {
   activeHotListingIds,
   listHotListings,
   searchIdsWithHotOrEndingSoon,
+  getHotPollTimeline,
+  pruneOldHotPolls,
 } from './db.js';
 import { runAllSearches } from './runner.js';
 import { sendDigest } from './emailer.js';
@@ -33,6 +35,7 @@ import { fetchProductInfo } from './pricecharting.js';
 import { matchesListing } from './filters.js';
 import { toUsdCents, getCachedRates, refreshRatesIfStale } from './currency.js';
 import { startNotifier, runNotifier } from './notifier.js';
+import { startHotPoller, getActivePollListingIds } from './hotpoller.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -236,7 +239,17 @@ app.delete('/api/hot/:listingId', (req, res) => {
 });
 
 app.get('/api/hot', (req, res) => {
-  res.json(listHotListings());
+  const rows = listHotListings();
+  const active = new Set(getActivePollListingIds());
+  res.json(rows.map((r) => ({ ...r, is_polling: active.has(r.listing_id) })));
+});
+
+app.get('/api/hot/:listingId/timeline', (req, res) => {
+  const listingId = req.params.listingId;
+  const since = parseInt(req.query.since) || 0;
+  const polls = getHotPollTimeline(listingId, since);
+  const active = getActivePollListingIds().includes(listingId);
+  res.json({ polls, is_polling: active });
 });
 
 app.post('/api/refresh-rates', async (req, res) => {
@@ -417,4 +430,7 @@ app.listen(PORT, () => {
   console.log(`🎴 pokemon-auctions server running at http://localhost:${PORT}`);
   if (AUTH_PASSWORD) console.log(`🔒 Basic Auth enabled (user: ${AUTH_USERNAME})`);
   startNotifier();
+  startHotPoller();
+  // Housekeeping: keep hot_polls from growing forever
+  setInterval(() => pruneOldHotPolls(6 * 3600), 10 * 60 * 1000);
 });
