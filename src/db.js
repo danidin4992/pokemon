@@ -372,6 +372,12 @@ export function getLastRun() {
     .get();
 }
 
+export function listRuns(limit = 50) {
+  return db
+    .prepare('SELECT * FROM runs ORDER BY id DESC LIMIT ?')
+    .all(limit);
+}
+
 export function enableNotification({ listing_id, lead_seconds, search_id, title, url, ends_at }) {
   if (!listing_id || !ends_at || !lead_seconds) return;
   db.prepare(

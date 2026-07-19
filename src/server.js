@@ -13,6 +13,7 @@ import {
   listListings,
   listListingsForSearch,
   getLastRun,
+  listRuns,
   getSettings,
   setSetting,
   enableNotification,
@@ -232,6 +233,11 @@ app.put('/api/settings', (req, res) => {
 
 app.get('/api/last-run', (req, res) => {
   res.json(getLastRun() || null);
+});
+
+app.get('/api/runs', (req, res) => {
+  const limit = Math.min(200, parseInt(req.query.limit) || 50);
+  res.json(listRuns(limit));
 });
 
 let isRunning = false;
