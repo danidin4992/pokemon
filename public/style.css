@@ -405,6 +405,38 @@ h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; 
   color: #0053a0;
   font-weight: 600;
 }
+
+.listing .hot-btn {
+  margin-top: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  background: white;
+  border: 1px solid #e3e5e8;
+  color: #666;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.listing .hot-btn:hover {
+  background: #fff5eb;
+  border-color: #f2b678;
+  color: #b45f00;
+}
+.listing .hot-btn.active {
+  background: linear-gradient(135deg, #ff6b35 0%, #ff8f2c 100%);
+  border-color: #ff6b35;
+  color: white;
+  box-shadow: 0 1px 3px rgba(255, 107, 53, 0.4);
+}
+.listing .hot-btn.active:hover {
+  background: linear-gradient(135deg, #e85d2f 0%, #ea7c1f 100%);
+}
+
+.listing.is-hot {
+  background: linear-gradient(90deg, #fff9f2 0%, white 40%);
+  border-left: 3px solid #ff6b35;
+}
 .listing .end-times .tz {
   color: #555;
 }

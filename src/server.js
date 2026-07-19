@@ -21,6 +21,11 @@ import {
   activeNotificationsByListing,
   upsertPriceHistory,
   getPriceHistory,
+  markHot,
+  unmarkHot,
+  activeHotListingIds,
+  listHotListings,
+  searchIdsWithHotOrEndingSoon,
 } from './db.js';
 import { runAllSearches } from './runner.js';
 import { sendDigest } from './emailer.js';
@@ -149,12 +154,14 @@ function filterListings(rows) {
 function annotateUsd(rows) {
   const rates = getCachedRates();
   const notifyMap = activeNotificationsByListing();
+  const hotIds = activeHotListingIds();
   return rows.map((r) => {
     const leads = notifyMap.get(r.listing_id);
     return {
       ...r,
       price_usd_cents: toUsdCents(r.price_numeric, r.price_currency, rates),
       notify_leads: leads ? [...leads].sort((a, b) => a - b) : [],
+      is_hot: hotIds.has(r.listing_id),
     };
   });
 }
@@ -205,6 +212,31 @@ app.post('/api/notify-now', async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+app.post('/api/hot/:listingId', (req, res) => {
+  const listingId = req.params.listingId;
+  const listing = listListings({ activeOnly: false }).find(
+    (l) => l.listing_id === listingId
+  );
+  if (!listing) return res.status(404).json({ error: 'listing not found' });
+  markHot({
+    listing_id: listing.listing_id,
+    search_id: listing.search_id,
+    title: listing.title,
+    url: listing.url,
+    ends_at: listing.ends_at,
+  });
+  res.json({ ok: true });
+});
+
+app.delete('/api/hot/:listingId', (req, res) => {
+  unmarkHot(req.params.listingId);
+  res.json({ ok: true });
+});
+
+app.get('/api/hot', (req, res) => {
+  res.json(listHotListings());
 });
 
 app.post('/api/refresh-rates', async (req, res) => {
@@ -283,7 +315,23 @@ app.post('/api/send-email-now', async (req, res) => {
 
 // In-process daily cron — replaces launchd in cloud deploys.
 // CRON_SCHEDULE default: 0 8 * * * (every day at 08:00). Set to "" to disable.
+async function runWarmRefresh() {
+  const searchIds = searchIdsWithHotOrEndingSoon(24);
+  if (searchIds.length === 0) return { skipped: 'no hot or ending-soon searches' };
+  const idSet = new Set(searchIds);
+  const result = await runAllSearches({
+    filterSearch: (s) => idSet.has(s.id),
+    onProgress: (e) => {
+      if (e.stage === 'scraped') console.log(`[warm]   ${e.search.name}: ${e.found} listings (${e.isNew} new)`);
+      if (e.stage === 'error') console.error(`[warm]   ${e.search.name}: ${e.error}`);
+    },
+  });
+  result.finish({ emailSent: false });
+  return { searches: searchIds.length, found: result.totalFound, new: result.totalNew };
+}
+
 const CRON_SCHEDULE = process.env.CRON_SCHEDULE ?? '0 8 * * *';
+const WARM_REFRESH_CRON = process.env.WARM_REFRESH_CRON || '';
 if (CRON_SCHEDULE) {
   if (!cron.validate(CRON_SCHEDULE)) {
     console.error(`Invalid CRON_SCHEDULE "${CRON_SCHEDULE}" — cron disabled`);
@@ -327,6 +375,42 @@ if (CRON_SCHEDULE) {
     console.log(`⏰ Daily cron scheduled: "${CRON_SCHEDULE}" (${process.env.CRON_TIMEZONE || 'Asia/Jerusalem'})`);
   }
 }
+
+if (WARM_REFRESH_CRON) {
+  if (!cron.validate(WARM_REFRESH_CRON)) {
+    console.error(`Invalid WARM_REFRESH_CRON "${WARM_REFRESH_CRON}" — warm refresh disabled`);
+  } else {
+    cron.schedule(WARM_REFRESH_CRON, async () => {
+      if (isRunning) return;
+      isRunning = true;
+      try {
+        console.log(`[warm ${new Date().toISOString()}] Starting refresh`);
+        const result = await runWarmRefresh();
+        console.log(`[warm] Done:`, result);
+      } catch (e) {
+        console.error('[warm] Error:', e);
+      } finally {
+        isRunning = false;
+      }
+    }, { timezone: process.env.CRON_TIMEZONE || 'Asia/Jerusalem' });
+    console.log(`🔥 Warm refresh scheduled: "${WARM_REFRESH_CRON}"`);
+  }
+} else {
+  console.log(`🔥 Warm refresh disabled (set WARM_REFRESH_CRON to enable, e.g. "*/90 * * * *")`);
+}
+
+app.post('/api/warm-refresh-now', async (req, res) => {
+  if (isRunning) return res.status(409).json({ error: 'run in progress' });
+  isRunning = true;
+  try {
+    const result = await runWarmRefresh();
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  } finally {
+    isRunning = false;
+  }
+});
 
 const PORT = process.env.PORT || 3737;
 app.listen(PORT, () => {

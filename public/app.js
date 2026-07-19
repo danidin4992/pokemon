@@ -503,6 +503,9 @@ function renderNotifyBox(l) {
   return `<div class="notify-box">
     <div class="notify-heading">🔔 Notify</div>
     ${boxes}
+    <button type="button" class="hot-btn ${l.is_hot ? 'active' : ''}" data-hot title="Track this listing intensively">
+      ${l.is_hot ? '🔥 Watching' : '🔥 Watch'}
+    </button>
   </div>`;
 }
 
@@ -510,7 +513,7 @@ function renderListingRow(l) {
   const bidCents = l.price_usd_cents;
   const marketCents = l.search_pc_psa10_cents;
   return `
-    <div class="listing" data-listing-id="${escapeHtml(l.listing_id)}">
+    <div class="listing ${l.is_hot ? 'is-hot' : ''}" data-listing-id="${escapeHtml(l.listing_id)}">
       <a href="${escapeHtml(l.url)}" target="_blank" rel="noopener">
         ${l.image_url ? `<img src="${escapeHtml(l.image_url)}" alt="">` : '<div style="width:80px;height:80px;background:#f0f0f0;border-radius:6px"></div>'}
       </a>
@@ -641,6 +644,34 @@ $('#listings-list').addEventListener('change', async (e) => {
     cb.checked = !cb.checked;
   } finally {
     cb.disabled = false;
+  }
+});
+
+// 🔥 Watch button toggles hot listing state
+$('#listings-list').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-hot]');
+  if (!btn) return;
+  const row = btn.closest('.listing');
+  const listingId = row?.dataset?.listingId;
+  if (!listingId) return;
+  const currentlyHot = btn.classList.contains('active');
+  const method = currentlyHot ? 'DELETE' : 'POST';
+  btn.disabled = true;
+  try {
+    const res = await fetch(`/api/hot/${encodeURIComponent(listingId)}`, { method });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      toast(j.error || 'Watch toggle failed');
+    } else {
+      btn.classList.toggle('active');
+      btn.textContent = currentlyHot ? '🔥 Watch' : '🔥 Watching';
+      row.classList.toggle('is-hot');
+      toast(currentlyHot ? 'Stopped watching' : 'Now watching intensively');
+    }
+  } catch (err) {
+    toast('Network error');
+  } finally {
+    btn.disabled = false;
   }
 });
 

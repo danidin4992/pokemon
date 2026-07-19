@@ -7,18 +7,19 @@ import {
   deleteListingsNotInSet,
   upsertPriceHistory,
 } from './db.js';
-import { scrapeSearch } from './scraper.js';
+import { datasource } from './datasource.js';
 import { fetchProductInfo } from './pricecharting.js';
 import { refreshRatesIfStale } from './currency.js';
 
-export async function runAllSearches({ onProgress } = {}) {
+export async function runAllSearches({ onProgress, filterSearch } = {}) {
   const runId = createRun();
   try {
     await refreshRatesIfStale();
   } catch (e) {
     onProgress?.({ stage: 'rates-error', error: e.message });
   }
-  const searches = listSearches({ activeOnly: true });
+  let searches = listSearches({ activeOnly: true });
+  if (typeof filterSearch === 'function') searches = searches.filter(filterSearch);
 
   let totalFound = 0;
   let totalNew = 0;
@@ -28,7 +29,7 @@ export async function runAllSearches({ onProgress } = {}) {
   for (const search of searches) {
     try {
       onProgress?.({ stage: 'scraping', search });
-      const listings = await scrapeSearch(search.url);
+      const listings = await datasource.listBySearchUrl(search.url);
       let newCount = 0;
       const seenIds = [];
       for (const l of listings) {

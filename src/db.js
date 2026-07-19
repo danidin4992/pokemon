@@ -83,6 +83,15 @@ db.exec(`
     PRIMARY KEY (search_id, ts_ms)
   );
 
+  CREATE TABLE IF NOT EXISTS hot_listings (
+    listing_id TEXT PRIMARY KEY,
+    search_id INTEGER,
+    title TEXT,
+    url TEXT,
+    ends_at INTEGER,
+    added_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+  );
+
   CREATE TABLE IF NOT EXISTS runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     started_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
@@ -376,6 +385,48 @@ export function listRuns(limit = 50) {
   return db
     .prepare('SELECT * FROM runs ORDER BY id DESC LIMIT ?')
     .all(limit);
+}
+
+export function markHot({ listing_id, search_id, title, url, ends_at }) {
+  if (!listing_id) return;
+  db.prepare(
+    `INSERT INTO hot_listings (listing_id, search_id, title, url, ends_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(listing_id) DO UPDATE SET
+       search_id = excluded.search_id,
+       title     = excluded.title,
+       url       = excluded.url,
+       ends_at   = excluded.ends_at`
+  ).run(listing_id, search_id ?? null, title ?? null, url ?? null, ends_at ?? null);
+}
+
+export function unmarkHot(listing_id) {
+  db.prepare('DELETE FROM hot_listings WHERE listing_id = ?').run(listing_id);
+}
+
+export function activeHotListingIds() {
+  return new Set(
+    db.prepare('SELECT listing_id FROM hot_listings').all().map((r) => r.listing_id)
+  );
+}
+
+export function listHotListings() {
+  return db.prepare('SELECT * FROM hot_listings ORDER BY added_at DESC').all();
+}
+
+export function searchIdsWithHotOrEndingSoon(hoursAhead = 24) {
+  const nowSec = Math.floor(Date.now() / 1000);
+  const cutoff = nowSec + hoursAhead * 3600;
+  const rows = db
+    .prepare(
+      `SELECT DISTINCT s.id FROM searches s
+       LEFT JOIN listings l ON l.search_id = s.id
+       LEFT JOIN hot_listings h ON h.listing_id = l.listing_id
+       WHERE s.active = 1
+         AND (h.listing_id IS NOT NULL OR (l.ends_at IS NOT NULL AND l.ends_at BETWEEN ? AND ?))`
+    )
+    .all(nowSec, cutoff);
+  return rows.map((r) => r.id);
 }
 
 export function enableNotification({ listing_id, lead_seconds, search_id, title, url, ends_at }) {
