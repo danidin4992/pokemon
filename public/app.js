@@ -423,12 +423,21 @@ async function loadListings() {
 
 function renderListings() {
   const only24h = $('#filter-24h').checked;
+  const belowMarketOnly = $('#filter-below-market').checked;
   const searchId = $('#filter-search').value;
   const now = Math.floor(Date.now() / 1000);
 
   let filtered = listings;
   if (only24h) {
     filtered = filtered.filter((l) => l.ends_at && l.ends_at - now <= 86400);
+  }
+  if (belowMarketOnly) {
+    filtered = filtered.filter(
+      (l) =>
+        l.price_usd_cents != null &&
+        l.search_pc_psa10_cents != null &&
+        l.price_usd_cents < l.search_pc_psa10_cents
+    );
   }
   if (searchId) {
     filtered = filtered.filter((l) => l.search_id === parseInt(searchId));
@@ -604,6 +613,7 @@ $('#send-email').onclick = async () => {
 };
 
 $('#filter-24h').onchange = renderListings;
+$('#filter-below-market').onchange = renderListings;
 $('#filter-search').onchange = renderListings;
 
 // Delegate notify checkbox toggles for the whole listings list
