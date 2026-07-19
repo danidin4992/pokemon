@@ -43,7 +43,56 @@ function enrichListing(n) {
   };
 }
 
+function fmtUsd(cents) {
+  if (cents == null) return '—';
+  const d = cents / 100;
+  return d >= 1000 ? '$' + Math.round(d).toLocaleString('en-US') : '$' + d.toFixed(2);
+}
+
+function isNtfy(url) {
+  return /ntfy\.sh/i.test(url) || /\/api\/v\d+\//i.test(url) === false && /ntfy/i.test(url);
+}
+
+// Build a ntfy-shaped POST for the phone: readable body + headers for title,
+// priority, tags, and click-through URL. Falls back to generic JSON otherwise.
 async function fireWebhook(payload) {
+  if (isNtfy(WEBHOOK_URL)) {
+    const bidStr = fmtUsd(payload.current_bid_usd != null ? payload.current_bid_usd * 100 : null);
+    const marketStr = fmtUsd(payload.psa10_market_usd != null ? payload.psa10_market_usd * 100 : null);
+    const diffLine =
+      payload.diff_pct != null
+        ? `${payload.is_below_market ? '↓' : '↑'} ${payload.diff_pct > 0 ? '+' : ''}${payload.diff_pct}% vs PSA 10`
+        : '';
+    const bidsLine = payload.bids != null ? `${payload.bids} bids` : '';
+    const body = [
+      `Ends in ~${payload.ends_in_minutes}m`,
+      `Bid ${bidStr}  ·  Market ${marketStr}`,
+      [diffLine, bidsLine].filter(Boolean).join('  ·  '),
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const headers = {
+      Title: `🎴 ${payload.title?.substring(0, 90) || 'Pokemon auction'}`,
+      Priority: payload.lead_minutes <= 5 ? 'urgent' : 'high',
+      Tags: payload.is_below_market ? 'fire,rocket,green_circle' : 'bell,rocket,red_circle',
+    };
+    if (payload.url) headers.Click = payload.url;
+    if (payload.url) {
+      headers.Actions = `view, Open on eBay, ${payload.url}, clear=true`;
+    }
+
+    const res = await fetch(WEBHOOK_URL, {
+      method: 'POST',
+      headers,
+      body,
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) throw new Error(`ntfy returned ${res.status} ${res.statusText}`);
+    return;
+  }
+
+  // Generic webhook (Slack / Discord / Zapier / custom) — original JSON body
   const res = await fetch(WEBHOOK_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
