@@ -5,6 +5,7 @@ let listings = [];
 let settings = { global_required_keywords: [], global_forbidden_keywords: [] };
 let recipients = [];
 let currentRecipient = localStorage.getItem('pokemon-recipient') || 'daniel';
+let currentSearchFilter = null; // id or null (mirrors #filter-search value)
 const editingSearchId = new Set();
 
 function parseCsv(v) {
@@ -257,11 +258,12 @@ function renderSparkline(history, currentCents) {
 function renderCardTile(s) {
   const psa10 = s.pc_psa10_cents != null ? fmtMoney(s.pc_psa10_cents) : '';
   const imgHtml = s.pc_image_url
-    ? `<img class="card-image" src="${escapeHtml(s.pc_image_url)}" alt="${escapeHtml(s.name)}" loading="lazy">`
+    ? `<img class="card-image" src="${escapeHtml(s.pc_image_url)}" alt="${escapeHtml(s.name)}" loading="lazy" onerror="this.classList.add('failed');this.replaceWith(Object.assign(document.createElement('div'),{className:'card-image placeholder',textContent:'🎴'}))">`
     : `<div class="card-image placeholder">🎴</div>`;
   const popover = s.pricecharting_url ? renderCardPopover(s) : '';
+  const isFiltered = currentSearchFilter === s.id;
   return `
-    <div class="card-tile ${s.active ? '' : 'inactive'}" data-id="${s.id}" title="${escapeHtml(s.pricecharting_url || '')}">
+    <div class="card-tile ${s.active ? '' : 'inactive'} ${isFiltered ? 'active-filter' : ''}" data-id="${s.id}" title="Click to filter auctions to this card">
       ${imgHtml}
       <div class="card-name">${escapeHtml(s.name)}</div>
       ${psa10 ? `<div class="card-psa10">PSA 10 ${escapeHtml(psa10)}</div>` : ''}
@@ -283,7 +285,10 @@ function renderCardPopover(s) {
     <div class="pc-product-name">${escapeHtml(s.pc_product_name || s.name)}</div>
     ${chips}
     ${spark}
-    <div class="updated-at">updated ${updated} · click card to open on PriceCharting ↗</div>
+    <div class="pc-actions">
+      <a class="pc-open" href="${escapeHtml(s.pricecharting_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open on PriceCharting ↗</a>
+      <span class="updated-at">updated ${updated}</span>
+    </div>
   </div>`;
 }
 
@@ -368,8 +373,21 @@ function renderSearches() {
     const id = parseInt(tile.dataset.id);
     tile.addEventListener('click', (e) => {
       if (e.target.closest('.card-controls')) return;
-      const s = searches.find((x) => x.id === id);
-      if (s?.pricecharting_url) window.open(s.pricecharting_url, '_blank', 'noopener');
+      if (e.target.closest('.card-popover')) return; // popover has its own links
+      // Toggle filter: click again to clear
+      const sel = $('#filter-search');
+      if (currentSearchFilter === id) {
+        currentSearchFilter = null;
+        sel.value = '';
+      } else {
+        currentSearchFilter = id;
+        sel.value = String(id);
+      }
+      renderSearches();
+      renderListings();
+      // Scroll auctions section into view (mobile)
+      const auctions = document.getElementById('listings-section');
+      if (auctions && window.innerWidth < 900) auctions.scrollIntoView({ behavior: 'smooth' });
     });
     tile.querySelector('[data-action="edit"]').onclick = (e) => {
       e.stopPropagation();
@@ -472,6 +490,7 @@ function renderListings() {
   const only24h = $('#filter-24h').checked;
   const belowMarketOnly = $('#filter-below-market').checked;
   const searchId = $('#filter-search').value;
+  currentSearchFilter = searchId ? parseInt(searchId) : null;
   const now = Math.floor(Date.now() / 1000);
 
   let filtered = listings;
@@ -807,7 +826,12 @@ $('#send-email').onclick = async () => {
 
 $('#filter-24h').onchange = renderListings;
 $('#filter-below-market').onchange = renderListings;
-$('#filter-search').onchange = renderListings;
+$('#filter-search').onchange = () => {
+  const v = $('#filter-search').value;
+  currentSearchFilter = v ? parseInt(v) : null;
+  renderSearches();
+  renderListings();
+};
 
 // Delegate notify checkbox toggles for the whole listings list
 $('#listings-list').addEventListener('change', async (e) => {

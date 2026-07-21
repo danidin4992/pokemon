@@ -71,18 +71,18 @@ function extractPsa10History(html) {
 }
 
 function extractProductImage($) {
-  // PriceCharting hosts product images at storage.googleapis.com under a
-  // /images.pricecharting.com/{hash}/{size}.jpg path.
-  let hi = null;
+  // PriceCharting hosts product images at
+  // storage.googleapis.com/images.pricecharting.com/{hash}/240.jpg
+  // Only the 240px size is actually uploaded — larger sizes return 404.
+  let src = null;
   $('img').each((_, el) => {
-    const src = $(el).attr('src') || '';
-    if (src.includes('storage.googleapis.com/images.pricecharting.com/')) {
-      // Prefer the highest-resolution version — swap /240.jpg → /480.jpg
-      hi = src.replace(/\/(\d+)\.(jpg|png|webp)(\?.*)?$/, '/480.$2');
-      return false; // stop after first
+    const s = $(el).attr('src') || '';
+    if (s.includes('storage.googleapis.com/images.pricecharting.com/')) {
+      src = s;
+      return false;
     }
   });
-  return hi;
+  return src;
 }
 
 export function parseProductPage(html) {

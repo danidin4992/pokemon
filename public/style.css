@@ -141,6 +141,26 @@ aside#searches-section { position: sticky; top: 84px; }
   z-index: 2;
 }
 .card-tile.inactive { opacity: 0.45; }
+.card-tile.active-filter {
+  border-color: #0053a0;
+  box-shadow: 0 0 0 2px rgba(0, 83, 160, 0.25);
+  background: linear-gradient(180deg, #f0f6ff 0%, white 100%);
+}
+.card-tile.active-filter::after {
+  content: '● Showing';
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  color: white;
+  background: #0053a0;
+  padding: 2px 6px;
+  border-radius: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  z-index: 3;
+}
 .card-tile .card-image {
   width: 100%;
   aspect-ratio: 5 / 7;
@@ -233,9 +253,23 @@ aside#searches-section { position: sticky; top: 84px; }
 .card-popover .updated-at {
   font-size: 11px;
   color: #999;
-  margin-top: 8px;
-  text-align: right;
 }
+.card-popover .pc-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed #f0dcc4;
+}
+.card-popover .pc-open {
+  color: #0053a0;
+  font-weight: 600;
+  font-size: 12px;
+  text-decoration: none;
+}
+.card-popover .pc-open:hover { text-decoration: underline; }
 
 .search-row { flex-wrap: wrap; }
 .pc-strip {
