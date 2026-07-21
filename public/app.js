@@ -665,6 +665,32 @@ async function loadLastRun() {
   $('#last-run').textContent = `last run ${ago} · ${run.listings_found} listings`;
 }
 
+async function loadEbayUsage() {
+  const el = $('#ebay-usage');
+  if (!el) return;
+  try {
+    const res = await fetch('/api/ebay-usage');
+    const u = await res.json();
+    if (!u.enabled) {
+      el.innerHTML = `<span class="dot"></span>scraper mode`;
+      el.className = 'ebay-usage disabled';
+      el.title = 'Not using eBay API — data source is HTML scraping';
+      return;
+    }
+    const pct = u.limit > 0 ? Math.round((u.total / u.limit) * 100) : 0;
+    const cls = pct >= 90 ? 'crit' : pct >= 60 ? 'warn' : '';
+    const hours = Math.floor(u.seconds_to_reset / 3600);
+    const mins = Math.floor((u.seconds_to_reset % 3600) / 60);
+    el.className = 'ebay-usage ' + cls;
+    el.innerHTML = `<span class="dot"></span>eBay ${u.total}/${u.limit}`;
+    el.title = `${u.total} / ${u.limit} calls today\n` +
+      `  · search: ${u.by_kind.search}\n` +
+      `  · item: ${u.by_kind.item}\n` +
+      `  · errors: ${u.by_kind.errors}\n` +
+      `resets in ${hours}h ${mins}m (UTC midnight)`;
+  } catch {}
+}
+
 function escapeHtml(s) {
   if (s == null) return '';
   return String(s)
@@ -886,4 +912,6 @@ loadSettings();
 loadSearches();
 loadListings();
 loadLastRun();
+loadEbayUsage();
 setInterval(loadLastRun, 30000);
+setInterval(loadEbayUsage, 30000);

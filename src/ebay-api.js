@@ -19,6 +19,47 @@ const SCOPE = 'https://api.ebay.com/oauth/api_scope';
 let cachedToken = null;
 let cachedExpiresAt = 0;
 
+// Local API usage counter. eBay's rate_limit endpoint requires a scope this
+// keyset doesn't have, so we count what we send. Since we're the only client
+// on the keyset, our count mirrors eBay's counter. Resets at UTC midnight.
+const DEFAULT_DAILY_LIMIT = 5000;
+let usageDay = todayUtc();
+let usageCounts = { search: 0, item: 0, other: 0, errors: 0 };
+
+function todayUtc() {
+  return new Date().toISOString().slice(0, 10);
+}
+function rolloverIfNeeded() {
+  const today = todayUtc();
+  if (today !== usageDay) {
+    usageDay = today;
+    usageCounts = { search: 0, item: 0, other: 0, errors: 0 };
+  }
+}
+function bump(kind) {
+  rolloverIfNeeded();
+  usageCounts[kind] = (usageCounts[kind] || 0) + 1;
+}
+
+export function getUsage() {
+  rolloverIfNeeded();
+  const total = usageCounts.search + usageCounts.item + usageCounts.other;
+  const limit = parseInt(process.env.EBAY_DAILY_LIMIT || DEFAULT_DAILY_LIMIT);
+  // eBay quota resets at UTC midnight
+  const now = new Date();
+  const tomorrow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+  const secondsToReset = Math.floor((tomorrow - now) / 1000);
+  return {
+    day: usageDay,
+    total,
+    limit,
+    remaining: Math.max(0, limit - total),
+    seconds_to_reset: secondsToReset,
+    by_kind: { ...usageCounts },
+    enabled: process.env.EBAY_DATA_SOURCE === 'api',
+  };
+}
+
 async function getAccessToken() {
   const now = Date.now();
   if (cachedToken && cachedExpiresAt - now > 5 * 60 * 1000) return cachedToken;
@@ -172,9 +213,11 @@ export async function searchByWebUrl(webUrl) {
     signal: AbortSignal.timeout(30000),
   });
   if (!res.ok) {
+    bump('errors');
     const text = await res.text().catch(() => '');
     throw new Error(`eBay Browse search ${res.status}: ${text.substring(0, 300)}`);
   }
+  bump('search');
   const json = await res.json();
   const summaries = Array.isArray(json.itemSummaries) ? json.itemSummaries : [];
   return summaries.map(summaryToListing).filter((l) => l.listing_id && l.title);
@@ -194,9 +237,11 @@ export async function getItemById(itemId) {
     signal: AbortSignal.timeout(15000),
   });
   if (!res.ok) {
+    bump('errors');
     const text = await res.text().catch(() => '');
     throw new Error(`eBay Browse item ${res.status}: ${text.substring(0, 200)}`);
   }
+  bump('item');
   const it = await res.json();
   const priceObj = it.currentBidPrice || it.price || null;
   const priceNum = priceObj && !isNaN(parseFloat(priceObj.value)) ? parseFloat(priceObj.value) : null;

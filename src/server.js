@@ -308,6 +308,15 @@ app.get('/api/last-run', (req, res) => {
   res.json(getLastRun() || null);
 });
 
+app.get('/api/ebay-usage', async (req, res) => {
+  try {
+    const { getUsage } = await import('./ebay-api.js');
+    res.json(getUsage());
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get('/api/runs', (req, res) => {
   const limit = Math.min(200, parseInt(req.query.limit) || 50);
   res.json(listRuns(limit));

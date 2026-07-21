@@ -20,6 +20,41 @@ h1 { margin: 0; font-size: 22px; }
 .header-actions { display: flex; gap: 8px; align-items: center; }
 .muted { color: #888; font-size: 13px; }
 
+.ebay-usage {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #eef7ee;
+  border: 1px solid #cfe5cf;
+  color: #1b7a3d;
+  cursor: default;
+}
+.ebay-usage.warn {
+  background: #fff5e0;
+  border-color: #f2b678;
+  color: #b45f00;
+}
+.ebay-usage.crit {
+  background: #fde8e8;
+  border-color: #f5c2c0;
+  color: #b1241c;
+}
+.ebay-usage .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.ebay-usage.disabled {
+  background: #f0f0f0;
+  border-color: #d0d0d0;
+  color: #888;
+}
+
 button {
   border: none;
   padding: 8px 14px;
