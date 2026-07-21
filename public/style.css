@@ -296,11 +296,12 @@ h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; 
 .card-pc-link:hover { background: #dce4ee; }
 
 /* Big hover popover — position: fixed so it escapes the sidebar's overflow
-   context. Anchored to top-right of viewport; overlays the auctions column. */
+   context. Anchored to bottom-right of viewport; overlays the auctions column. */
 .card-popover {
   position: fixed;
-  top: 100px;
-  right: 40px;
+  bottom: 24px;
+  right: 24px;
+  top: auto;
   width: 500px;
   max-width: calc(100vw - 320px);
   background: white;
@@ -310,7 +311,7 @@ h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; 
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
   opacity: 0;
   pointer-events: none;
-  transform: translateY(-4px);
+  transform: translateY(8px);
   transition: opacity 0.15s ease, transform 0.15s ease;
   z-index: 100;
 }
