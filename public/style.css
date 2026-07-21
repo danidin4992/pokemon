@@ -172,14 +172,13 @@ h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; 
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   cursor: pointer;
-  transition: box-shadow 0.15s, transform 0.15s;
-  overflow: visible;
+  transition: box-shadow 0.15s, border-color 0.15s;
+  overflow: hidden;
 }
 .card-tile:hover {
   box-shadow: 0 4px 12px rgba(0, 83, 160, 0.15);
-  transform: translateY(-2px);
   border-color: #b4c7de;
   z-index: 2;
 }
@@ -259,60 +258,42 @@ h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; 
 .card-tile .card-controls button:hover { background: #f0f4f8; color: #0053a0; }
 .card-tile .card-controls button.danger:hover { background: #fce4e4; color: #c0392b; border-color: #f5c2c0; }
 
-.card-popover {
-  position: absolute;
-  left: calc(100% + 10px);
-  top: 0;
-  width: 340px;
-  background: white;
-  border: 1px solid #e3e5e8;
-  border-radius: 8px;
-  padding: 12px 14px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s;
-  z-index: 20;
-}
-.card-tile:hover .card-popover { opacity: 1; pointer-events: auto; }
-.card-popover .pc-heading {
-  font-size: 12px;
-  color: #888;
-  margin-bottom: 4px;
-}
-.card-popover .pc-product-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: #1a1a1a;
-  margin-bottom: 8px;
-}
-.card-popover .pc-tier { display: inline-flex; }
-.card-popover .pc-spark {
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px dashed #f0dcc4;
-  gap: 10px;
-}
-.card-popover .updated-at {
-  font-size: 11px;
-  color: #999;
-}
-.card-popover .pc-actions {
+.card-trend {
+  width: 100%;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px dashed #f0dcc4;
-}
-.card-popover .pc-open {
-  color: #0053a0;
+  gap: 6px;
+  font-size: 10px;
   font-weight: 600;
-  font-size: 12px;
-  text-decoration: none;
+  margin-top: 2px;
 }
-.card-popover .pc-open:hover { text-decoration: underline; }
+.card-trend .mini-spark {
+  flex: 1;
+  height: 22px;
+  min-width: 0;
+}
+.card-trend .trend-text {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.card-trend .trend-period { color: #999; font-weight: 500; }
+.card-trend.up .trend-text { color: #b1241c; }
+.card-trend.down .trend-text { color: #1b7a3d; }
+.card-trend.flat .trend-text { color: #666; }
+
+.card-pc-link {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #0053a0;
+  text-decoration: none;
+  padding: 2px 6px;
+  background: #eef2f7;
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+}
+.card-pc-link:hover { background: #dce4ee; }
 
 .search-row { flex-wrap: wrap; }
 .pc-strip {

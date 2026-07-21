@@ -255,41 +255,71 @@ function renderSparkline(history, currentCents) {
   </div>`;
 }
 
+function renderMiniSparkline(history) {
+  if (!Array.isArray(history) || history.length < 2) return '';
+  const W = 100, H = 24;
+  const pts = history.filter((p) => p.price_cents > 0);
+  if (pts.length < 2) return '';
+  const values = pts.map((p) => p.price_cents);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const first = pts[0].ts_ms;
+  const last = pts[pts.length - 1].ts_ms;
+  const tRange = last - first || 1;
+  const xy = pts.map((p) => {
+    const x = ((p.ts_ms - first) / tRange) * W;
+    const y = (1 - (p.price_cents - min) / range) * (H - 4) + 2;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const path = 'M' + xy.join(' L');
+  const areaPath = path + ` L${W},${H} L0,${H} Z`;
+  return `<svg class="mini-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    <path d="${areaPath}" fill="#fce9dc" opacity="0.6"/>
+    <path d="${path}" fill="none" stroke="#e05a1c" stroke-width="1.4"/>
+  </svg>`;
+}
+
 function renderCardTile(s) {
   const psa10 = s.pc_psa10_cents != null ? fmtMoney(s.pc_psa10_cents) : '';
   const imgHtml = s.pc_image_url
     ? `<img class="card-image" src="${escapeHtml(s.pc_image_url)}" alt="${escapeHtml(s.name)}" loading="lazy" onerror="this.classList.add('failed');this.replaceWith(Object.assign(document.createElement('div'),{className:'card-image placeholder',textContent:'🎴'}))">`
     : `<div class="card-image placeholder">🎴</div>`;
-  const popover = s.pricecharting_url ? renderCardPopover(s) : '';
   const isFiltered = currentSearchFilter === s.id;
+
+  // Trend snippet + sparkline (only if we have history)
+  let trendBar = '';
+  if (Array.isArray(s.psa10_history) && s.psa10_history.length >= 2) {
+    const pts = s.psa10_history.filter((p) => p.price_cents > 0);
+    if (pts.length >= 2) {
+      const diff = pts[pts.length - 1].price_cents - pts[0].price_cents;
+      const pct = Math.round((diff / pts[0].price_cents) * 100);
+      const arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '→';
+      const cls = diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat';
+      trendBar = `<div class="card-trend ${cls}">
+        ${renderMiniSparkline(s.psa10_history)}
+        <span class="trend-text">${arrow} ${pct > 0 ? '+' : ''}${pct}% <span class="trend-period">6mo</span></span>
+      </div>`;
+    }
+  }
+
+  const pcLink = s.pricecharting_url
+    ? `<a class="card-pc-link" href="${escapeHtml(s.pricecharting_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open on PriceCharting">PC ↗</a>`
+    : '';
+
   return `
-    <div class="card-tile ${s.active ? '' : 'inactive'} ${isFiltered ? 'active-filter' : ''}" data-id="${s.id}" title="Click to filter auctions to this card">
+    <div class="card-tile ${s.active ? '' : 'inactive'} ${isFiltered ? 'active-filter' : ''}" data-id="${s.id}">
       ${imgHtml}
       <div class="card-name">${escapeHtml(s.name)}</div>
       ${psa10 ? `<div class="card-psa10">PSA 10 ${escapeHtml(psa10)}</div>` : ''}
+      ${trendBar}
+      ${pcLink}
       <div class="card-controls">
         <button data-action="edit" title="Edit">✎</button>
         <button data-action="toggle" title="${s.active ? 'Pause' : 'Resume'}">${s.active ? '⏸' : '▶'}</button>
         <button data-action="delete" class="danger" title="Delete">✕</button>
       </div>
-      ${popover}
     </div>`;
-}
-
-function renderCardPopover(s) {
-  const chips = `<span class="pc-tier psa10"><span class="label">PSA 10</span><span class="value">${escapeHtml(fmtMoney(s.pc_psa10_cents))}</span></span>`;
-  const spark = renderSparkline(s.psa10_history, s.pc_psa10_cents);
-  const updated = s.pc_updated_at ? fmtAgo(s.pc_updated_at) : 'not fetched';
-  return `<div class="card-popover">
-    <div class="pc-heading">PriceCharting</div>
-    <div class="pc-product-name">${escapeHtml(s.pc_product_name || s.name)}</div>
-    ${chips}
-    ${spark}
-    <div class="pc-actions">
-      <a class="pc-open" href="${escapeHtml(s.pricecharting_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open on PriceCharting ↗</a>
-      <span class="updated-at">updated ${updated}</span>
-    </div>
-  </div>`;
 }
 
 function renderPcStrip(s) {
