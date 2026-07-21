@@ -440,6 +440,20 @@ if (WARM_REFRESH_CRON) {
   console.log(`🔥 Warm refresh disabled (set WARM_REFRESH_CRON to enable, e.g. "*/90 * * * *")`);
 }
 
+// Temporary: force API path once regardless of EBAY_DATA_SOURCE — for smoke test.
+app.post('/api/ebay-api-smoke/:searchId', async (req, res) => {
+  try {
+    const id = parseInt(req.params.searchId);
+    const s = listSearches().find((x) => x.id === id);
+    if (!s) return res.status(404).json({ error: 'search not found' });
+    const { apiDataSource } = await import('./datasource.js');
+    const listings = await apiDataSource.listBySearchUrl(s.url);
+    res.json({ count: listings.length, sample: listings.slice(0, 3) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post('/api/warm-refresh-now', async (req, res) => {
   if (isRunning) return res.status(409).json({ error: 'run in progress' });
   isRunning = true;

@@ -13,6 +13,7 @@
  *   otherwise                                     → scrape (default)
  */
 import { scrapeSearch, fetchItemPage } from './scraper.js';
+import { searchByWebUrl, getItemById } from './ebay-api.js';
 
 export const scrapeDataSource = {
   name: 'scrape',
@@ -24,16 +25,15 @@ export const scrapeDataSource = {
   },
 };
 
-// Placeholder: fills in when we swap in the Buy Browse API.
-// The shape it returns must match the scraper's parseListings() output so the
-// rest of the app (DB upsert, UI render, notifier enrichment) needs zero changes.
+// Official eBay Buy Browse API. Returns the same shape as parseListings()
+// so DB/UI/notifier/hot-poller need no changes.
 export const apiDataSource = {
   name: 'api',
-  async listBySearchUrl(_url) {
-    throw new Error('eBay Browse API adapter not implemented yet — waiting on developer approval');
+  async listBySearchUrl(url) {
+    return await searchByWebUrl(url);
   },
-  async listByItemId(_itemId) {
-    throw new Error('eBay Browse API adapter not implemented yet — waiting on developer approval');
+  async listByItemId(itemId) {
+    return await getItemById(itemId);
   },
 };
 
