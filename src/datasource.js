@@ -38,7 +38,9 @@ export const apiDataSource = {
 };
 
 const wantApi =
-  process.env.EBAY_DATA_SOURCE === 'api' && !!process.env.EBAY_API_TOKEN;
+  process.env.EBAY_DATA_SOURCE === 'api' &&
+  !!process.env.EBAY_APP_ID &&
+  !!process.env.EBAY_CERT_ID;
 
 export const datasource = wantApi ? apiDataSource : scrapeDataSource;
 
