@@ -254,6 +254,39 @@ function renderSparkline(history, currentCents) {
   </div>`;
 }
 
+function renderCardTile(s) {
+  const psa10 = s.pc_psa10_cents != null ? fmtMoney(s.pc_psa10_cents) : '';
+  const imgHtml = s.pc_image_url
+    ? `<img class="card-image" src="${escapeHtml(s.pc_image_url)}" alt="${escapeHtml(s.name)}" loading="lazy">`
+    : `<div class="card-image placeholder">🎴</div>`;
+  const popover = s.pricecharting_url ? renderCardPopover(s) : '';
+  return `
+    <div class="card-tile ${s.active ? '' : 'inactive'}" data-id="${s.id}" title="${escapeHtml(s.pricecharting_url || '')}">
+      ${imgHtml}
+      <div class="card-name">${escapeHtml(s.name)}</div>
+      ${psa10 ? `<div class="card-psa10">PSA 10 ${escapeHtml(psa10)}</div>` : ''}
+      <div class="card-controls">
+        <button data-action="edit" title="Edit">✎</button>
+        <button data-action="toggle" title="${s.active ? 'Pause' : 'Resume'}">${s.active ? '⏸' : '▶'}</button>
+        <button data-action="delete" class="danger" title="Delete">✕</button>
+      </div>
+      ${popover}
+    </div>`;
+}
+
+function renderCardPopover(s) {
+  const chips = `<span class="pc-tier psa10"><span class="label">PSA 10</span><span class="value">${escapeHtml(fmtMoney(s.pc_psa10_cents))}</span></span>`;
+  const spark = renderSparkline(s.psa10_history, s.pc_psa10_cents);
+  const updated = s.pc_updated_at ? fmtAgo(s.pc_updated_at) : 'not fetched';
+  return `<div class="card-popover">
+    <div class="pc-heading">PriceCharting</div>
+    <div class="pc-product-name">${escapeHtml(s.pc_product_name || s.name)}</div>
+    ${chips}
+    ${spark}
+    <div class="updated-at">updated ${updated} · click card to open on PriceCharting ↗</div>
+  </div>`;
+}
+
 function renderPcStrip(s) {
   if (!s.pricecharting_url) return '';
   const chips = `<span class="pc-tier psa10"><span class="label">PSA 10</span><span class="value">${escapeHtml(fmtMoney(s.pc_psa10_cents))}</span></span>`;
@@ -312,30 +345,40 @@ function initEditStripTags(row, s) {
 function renderSearches() {
   const list = $('#searches-list');
   if (searches.length === 0) {
-    list.innerHTML = '<div class="empty">No searches yet. Build one on eBay (with auction filter), copy the URL, and paste above.</div>';
+    list.innerHTML = '<div class="empty" style="grid-column:1/-1">No cards yet. Add one above.</div>';
     return;
   }
   list.innerHTML = searches
-    .map(
-      (s) => `
-    <div class="search-row ${s.active ? '' : 'inactive'}" data-id="${s.id}">
-      <span class="name">${escapeHtml(s.name)}</span>
-      <span class="url-truncate" title="${escapeHtml(s.url)}">${escapeHtml(s.url)}</span>
-      <button class="secondary" data-action="edit">${editingSearchId.has(s.id) ? 'Close' : 'Edit'}</button>
-      <button class="secondary" data-action="toggle">${s.active ? 'Pause' : 'Resume'}</button>
-      <button class="danger" data-action="delete">Delete</button>
-      ${renderPcStrip(s)}
-      ${renderEditStrip(s)}
-    </div>`
-    )
+    .map((s) => renderCardTile(s))
     .join('');
+  // Show edit strips for currently-editing cards below the grid
+  const editing = searches.filter((s) => editingSearchId.has(s.id));
+  if (editing.length) {
+    const editHtml = editing.map((s) => `
+      <div class="search-row" data-id="${s.id}" style="grid-column:1/-1;background:white;border:1px solid #e3e5e8;border-radius:6px;padding:10px 14px">
+        <div style="font-weight:600;margin-bottom:6px">Editing: ${escapeHtml(s.name)}</div>
+        ${renderEditStrip(s)}
+      </div>`).join('');
+    list.insertAdjacentHTML('beforeend', editHtml);
+  }
 
   perSearchTagInputs.clear();
-  list.querySelectorAll('.search-row').forEach((row) => {
-    const id = parseInt(row.dataset.id);
-    const s = searches.find((x) => x.id === id);
-    if (s) initEditStripTags(row, s);
-    row.querySelector('[data-action="toggle"]').onclick = async () => {
+  // Wire up card tiles
+  list.querySelectorAll('.card-tile').forEach((tile) => {
+    const id = parseInt(tile.dataset.id);
+    tile.addEventListener('click', (e) => {
+      if (e.target.closest('.card-controls')) return;
+      const s = searches.find((x) => x.id === id);
+      if (s?.pricecharting_url) window.open(s.pricecharting_url, '_blank', 'noopener');
+    });
+    tile.querySelector('[data-action="edit"]').onclick = (e) => {
+      e.stopPropagation();
+      if (editingSearchId.has(id)) editingSearchId.delete(id);
+      else editingSearchId.add(id);
+      renderSearches();
+    };
+    tile.querySelector('[data-action="toggle"]').onclick = async (e) => {
+      e.stopPropagation();
       const s = searches.find((x) => x.id === id);
       await fetch(`/api/searches/${id}`, {
         method: 'PATCH',
@@ -344,12 +387,19 @@ function renderSearches() {
       });
       loadSearches();
     };
-    row.querySelector('[data-action="delete"]').onclick = async () => {
+    tile.querySelector('[data-action="delete"]').onclick = async (e) => {
+      e.stopPropagation();
       if (!confirm('Delete this search and all its listings?')) return;
       await fetch(`/api/searches/${id}`, { method: 'DELETE' });
       loadSearches();
       loadListings();
     };
+  });
+
+  list.querySelectorAll('.search-row').forEach((row) => {
+    const id = parseInt(row.dataset.id);
+    const s = searches.find((x) => x.id === id);
+    if (s) initEditStripTags(row, s);
     const refreshBtn = row.querySelector('[data-action="refresh-pc"]');
     if (refreshBtn) {
       refreshBtn.onclick = async () => {
@@ -360,18 +410,13 @@ function renderSearches() {
           toast('Prices refreshed');
           loadSearches();
         } else {
-          const e = await res.json();
-          toast(e.error || 'Refresh failed');
+          const err = await res.json();
+          toast(err.error || 'Refresh failed');
         }
         refreshBtn.disabled = false;
         refreshBtn.textContent = '↻';
       };
     }
-    row.querySelector('[data-action="edit"]').onclick = () => {
-      if (editingSearchId.has(id)) editingSearchId.delete(id);
-      else editingSearchId.add(id);
-      renderSearches();
-    };
     const saveBtn = row.querySelector('[data-action="save"]');
     if (saveBtn) {
       saveBtn.onclick = async () => {

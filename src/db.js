@@ -142,6 +142,7 @@ function migrate() {
   add('pc_updated_at', 'INTEGER');
   add('required_keywords', 'TEXT'); // JSON array of strings
   add('forbidden_keywords', 'TEXT'); // JSON array of strings
+  add('pc_image_url', 'TEXT'); // PriceCharting product image
 
   // Migrate notifications: add lead_seconds column + composite UNIQUE.
   // Rebuild table if old schema (UNIQUE on listing_id alone) is detected.
@@ -275,6 +276,7 @@ export function updateSearchPrices(id, info) {
     `UPDATE searches SET
        pc_product_id = ?,
        pc_product_name = ?,
+       pc_image_url = COALESCE(?, pc_image_url),
        pc_loose_cents = ?,
        pc_grade7_cents = ?,
        pc_grade8_cents = ?,
@@ -286,6 +288,7 @@ export function updateSearchPrices(id, info) {
   ).run(
     info.product_id ?? null,
     info.product_name ?? null,
+    info.image_url ?? null,
     info.prices?.loose ?? null,
     info.prices?.grade7 ?? null,
     info.prices?.grade8 ?? null,

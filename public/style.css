@@ -104,28 +104,138 @@ h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; 
   color: white;
 }
 
-#searches-list { display: flex; flex-direction: column; gap: 6px; }
-.search-row {
+.two-col {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 24px;
+  align-items: flex-start;
+}
+@media (max-width: 900px) {
+  .two-col { grid-template-columns: 1fr; }
+}
+aside#searches-section { position: sticky; top: 84px; }
+
+#searches-list.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.card-tile {
+  position: relative;
   background: white;
   border: 1px solid #e3e5e8;
-  border-radius: 6px;
-  padding: 10px 14px;
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.15s;
+  overflow: visible;
+}
+.card-tile:hover {
+  box-shadow: 0 4px 12px rgba(0, 83, 160, 0.15);
+  transform: translateY(-2px);
+  border-color: #b4c7de;
+  z-index: 2;
+}
+.card-tile.inactive { opacity: 0.45; }
+.card-tile .card-image {
+  width: 100%;
+  aspect-ratio: 5 / 7;
+  object-fit: contain;
+  background: linear-gradient(180deg, #fafbfc 0%, #f0f2f5 100%);
+  border-radius: 4px;
+}
+.card-tile .card-image.placeholder {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 14px;
+  justify-content: center;
+  color: #aaa;
+  font-size: 30px;
 }
-.search-row .name { font-weight: 600; min-width: 160px; }
-.search-row .url-truncate {
-  flex: 1;
-  color: #666;
+.card-tile .card-name {
   font-size: 12px;
-  font-family: ui-monospace, monospace;
-  white-space: nowrap;
+  font-weight: 600;
+  color: #1a1a1a;
+  text-align: center;
+  line-height: 1.25;
+  height: 30px;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
-.search-row.inactive { opacity: 0.5; }
+.card-tile .card-psa10 {
+  font-size: 12px;
+  color: #b45f00;
+  font-weight: 700;
+}
+.card-tile .card-controls {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.card-tile:hover .card-controls { opacity: 1; }
+.card-tile .card-controls button {
+  background: white;
+  border: 1px solid #ccc;
+  color: #666;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  padding: 0;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.card-tile .card-controls button:hover { background: #f0f4f8; color: #0053a0; }
+.card-tile .card-controls button.danger:hover { background: #fce4e4; color: #c0392b; border-color: #f5c2c0; }
+
+.card-popover {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 0;
+  width: 340px;
+  background: white;
+  border: 1px solid #e3e5e8;
+  border-radius: 8px;
+  padding: 12px 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+  z-index: 20;
+}
+.card-tile:hover .card-popover { opacity: 1; pointer-events: auto; }
+.card-popover .pc-heading {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 4px;
+}
+.card-popover .pc-product-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 8px;
+}
+.card-popover .pc-tier { display: inline-flex; }
+.card-popover .pc-spark {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed #f0dcc4;
+  gap: 10px;
+}
+.card-popover .updated-at {
+  font-size: 11px;
+  color: #999;
+  margin-top: 8px;
+  text-align: right;
+}
 
 .search-row { flex-wrap: wrap; }
 .pc-strip {

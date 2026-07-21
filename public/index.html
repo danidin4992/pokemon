@@ -38,30 +38,32 @@
       </div>
     </section>
 
-    <section id="searches-section">
-      <h2>Watched searches</h2>
-      <form id="add-search-form" class="add-form">
-        <input id="search-name" placeholder="Name (e.g. Pikachu ex #276)" required>
-        <input id="search-url" placeholder="eBay search URL" required>
-        <input id="search-pc-url" placeholder="PriceCharting URL (optional)">
-        <button type="submit">Add</button>
-      </form>
-      <div id="searches-list"></div>
-    </section>
+    <div class="two-col">
+      <aside id="searches-section">
+        <h2>Watched cards</h2>
+        <form id="add-search-form" class="add-form">
+          <input id="search-name" placeholder="Name (e.g. Pikachu ex #276)" required>
+          <input id="search-url" placeholder="eBay search URL" required>
+          <input id="search-pc-url" placeholder="PriceCharting URL (optional)">
+          <button type="submit">Add</button>
+        </form>
+        <div id="searches-list" class="cards-grid"></div>
+      </aside>
 
-    <section id="listings-section">
-      <div class="section-head">
-        <h2>Active auctions</h2>
-        <div class="filters">
-          <label><input type="checkbox" id="filter-24h" checked> Ending in 24h</label>
-          <label><input type="checkbox" id="filter-below-market"> 🟢 Below market only</label>
-          <select id="filter-search">
-            <option value="">All searches</option>
-          </select>
+      <section id="listings-section">
+        <div class="section-head">
+          <h2>Active auctions</h2>
+          <div class="filters">
+            <label><input type="checkbox" id="filter-24h" checked> Ending in 24h</label>
+            <label><input type="checkbox" id="filter-below-market"> 🟢 Below market only</label>
+            <select id="filter-search">
+              <option value="">All searches</option>
+            </select>
+          </div>
         </div>
-      </div>
-      <div id="listings-list"></div>
-    </section>
+        <div id="listings-list"></div>
+      </section>
+    </div>
   </main>
 
   <div id="toast"></div>

@@ -70,6 +70,21 @@ function extractPsa10History(html) {
     .map(([ts_ms, cents]) => ({ ts_ms: Math.floor(ts_ms), cents: Math.round(cents) }));
 }
 
+function extractProductImage($) {
+  // PriceCharting hosts product images at storage.googleapis.com under a
+  // /images.pricecharting.com/{hash}/{size}.jpg path.
+  let hi = null;
+  $('img').each((_, el) => {
+    const src = $(el).attr('src') || '';
+    if (src.includes('storage.googleapis.com/images.pricecharting.com/')) {
+      // Prefer the highest-resolution version — swap /240.jpg → /480.jpg
+      hi = src.replace(/\/(\d+)\.(jpg|png|webp)(\?.*)?$/, '/480.$2');
+      return false; // stop after first
+    }
+  });
+  return hi;
+}
+
 export function parseProductPage(html) {
   const $ = cheerio.load(html);
 
@@ -89,10 +104,12 @@ export function parseProductPage(html) {
   }
 
   const psa10History = extractPsa10History(html);
+  const image_url = extractProductImage($);
 
   return {
     product_id: productId,
     product_name: productName,
+    image_url,
     prices,
     psa10_history: psa10History,
   };
