@@ -5,7 +5,7 @@ let listings = [];
 let settings = { global_required_keywords: [], global_forbidden_keywords: [] };
 let recipients = [];
 let currentRecipient = localStorage.getItem('pokemon-recipient') || 'daniel';
-let currentSearchFilter = null; // id or null (mirrors #filter-search value)
+const currentSearchFilters = new Set(); // multi-select card ids (empty = show all)
 const editingSearchId = new Set();
 
 function parseCsv(v) {
@@ -286,7 +286,7 @@ function renderCardTile(s) {
   const imgHtml = s.pc_image_url
     ? `<img class="card-image" src="${escapeHtml(s.pc_image_url)}" alt="${escapeHtml(s.name)}" loading="lazy" onerror="this.classList.add('failed');this.replaceWith(Object.assign(document.createElement('div'),{className:'card-image placeholder',textContent:'🎴'}))">`
     : `<div class="card-image placeholder">🎴</div>`;
-  const isFiltered = currentSearchFilter === s.id;
+  const isFiltered = currentSearchFilters.has(s.id);
 
   // Trend snippet + sparkline (only if we have history)
   let trendBar = '';
@@ -438,18 +438,13 @@ function renderSearches() {
     tile.addEventListener('click', (e) => {
       if (e.target.closest('.card-controls')) return;
       if (e.target.closest('.card-popover')) return; // popover has its own links
-      // Toggle filter: click again to clear
-      const sel = $('#filter-search');
-      if (currentSearchFilter === id) {
-        currentSearchFilter = null;
-        sel.value = '';
-      } else {
-        currentSearchFilter = id;
-        sel.value = String(id);
-      }
+      if (e.target.closest('a')) return; // let PC ↗ do its thing
+      // Multi-select: toggle this card in the filter Set
+      if (currentSearchFilters.has(id)) currentSearchFilters.delete(id);
+      else currentSearchFilters.add(id);
+      syncFilterDropdown();
       renderSearches();
       renderListings();
-      // Scroll auctions section into view (mobile)
       const auctions = document.getElementById('listings-section');
       if (auctions && window.innerWidth < 900) auctions.scrollIntoView({ behavior: 'smooth' });
     });
@@ -536,12 +531,11 @@ function renderSearches() {
 
 function renderSearchFilter() {
   const sel = $('#filter-search');
-  const current = sel.value;
   sel.innerHTML = '<option value="">All searches</option>' +
     searches
       .map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`)
       .join('');
-  sel.value = current;
+  syncFilterDropdown();
 }
 
 async function loadListings() {
@@ -553,8 +547,6 @@ async function loadListings() {
 function renderListings() {
   const only24h = $('#filter-24h').checked;
   const belowMarketOnly = $('#filter-below-market').checked;
-  const searchId = $('#filter-search').value;
-  currentSearchFilter = searchId ? parseInt(searchId) : null;
   const now = Math.floor(Date.now() / 1000);
 
   let filtered = listings;
@@ -569,9 +561,10 @@ function renderListings() {
         l.price_usd_cents < l.search_pc_psa10_cents
     );
   }
-  if (searchId) {
-    filtered = filtered.filter((l) => l.search_id === parseInt(searchId));
+  if (currentSearchFilters.size > 0) {
+    filtered = filtered.filter((l) => currentSearchFilters.has(l.search_id));
   }
+  const searchId = currentSearchFilters.size === 1 ? [...currentSearchFilters][0] : null;
 
   const container = $('#listings-list');
 
@@ -892,10 +885,37 @@ $('#filter-24h').onchange = renderListings;
 $('#filter-below-market').onchange = renderListings;
 $('#filter-search').onchange = () => {
   const v = $('#filter-search').value;
-  currentSearchFilter = v ? parseInt(v) : null;
+  currentSearchFilters.clear();
+  if (v === '__multi__') {
+    // no-op — placeholder for existing multi-select from cards
+  } else if (v) {
+    currentSearchFilters.add(parseInt(v));
+  }
+  syncFilterDropdown();
   renderSearches();
   renderListings();
 };
+
+function syncFilterDropdown() {
+  const sel = $('#filter-search');
+  if (!sel) return;
+  // Refresh options so the "Multiple" label reflects the current count
+  const currentBase = [...sel.options]
+    .filter((o) => o.value !== '__multi__')
+    .map((o) => o.outerHTML)
+    .join('');
+  const count = currentSearchFilters.size;
+  const multi = count >= 2
+    ? `<option value="__multi__" selected>${count} cards selected</option>`
+    : '';
+  sel.innerHTML = multi + currentBase;
+  if (count === 1) sel.value = String([...currentSearchFilters][0]);
+  else if (count === 0) sel.value = '';
+  else sel.value = '__multi__';
+  // Show/hide clear button
+  const clearBtn = $('#filter-clear');
+  if (clearBtn) clearBtn.style.display = count > 0 ? 'inline-flex' : 'none';
+}
 
 // Delegate notify checkbox toggles for the whole listings list
 $('#listings-list').addEventListener('change', async (e) => {
@@ -1039,6 +1059,16 @@ $('#save-settings').onclick = async () => {
     toast('Save failed');
   }
 };
+
+const clearBtn = document.getElementById('filter-clear');
+if (clearBtn) {
+  clearBtn.onclick = () => {
+    currentSearchFilters.clear();
+    syncFilterDropdown();
+    renderSearches();
+    renderListings();
+  };
+}
 
 loadRecipients();
 loadSettings();

@@ -92,6 +92,17 @@ h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; 
 .section-head h2 { margin: 0; }
 .filters { display: flex; gap: 12px; align-items: center; font-size: 13px; }
 .filters select { padding: 4px 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 13px; }
+.filters .filter-clear {
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #fde8e8;
+  color: #b1241c;
+  border: 1px solid #f5c2c0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.filters .filter-clear:hover { background: #fac6c6; }
 
 .add-form {
   display: flex;
