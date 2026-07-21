@@ -295,6 +295,96 @@ h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; 
 }
 .card-pc-link:hover { background: #dce4ee; }
 
+/* Big hover popover — position: fixed so it escapes the sidebar's overflow
+   context. Anchored to top-right of viewport; overlays the auctions column. */
+.card-popover {
+  position: fixed;
+  top: 100px;
+  right: 40px;
+  width: 500px;
+  max-width: calc(100vw - 320px);
+  background: white;
+  border: 1px solid #e3e5e8;
+  border-radius: 10px;
+  padding: 16px 18px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 100;
+}
+.card-tile:hover .card-popover {
+  opacity: 1;
+  transform: translateY(0);
+}
+.card-popover .pop-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.card-popover .pop-heading {
+  font-size: 11px;
+  color: #b45f00;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.card-popover .pop-product {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-top: 2px;
+  line-height: 1.25;
+}
+.card-popover .pop-open {
+  color: #0053a0;
+  font-weight: 700;
+  font-size: 12px;
+  text-decoration: none;
+  padding: 5px 10px;
+  background: #eef2f7;
+  border-radius: 5px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.card-popover .pop-open:hover { background: #dce4ee; }
+.card-popover .pop-tiers {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.card-popover .pop-chart {
+  border-top: 1px dashed #f0dcc4;
+  padding-top: 10px;
+}
+.card-popover .pop-chart svg {
+  width: 100%;
+  height: auto;
+  background: #fefaf5;
+  border-radius: 6px;
+}
+.card-popover .pop-updated {
+  font-size: 11px;
+  color: #999;
+  margin-top: 8px;
+  text-align: right;
+}
+@media (max-width: 900px) {
+  .card-popover {
+    position: absolute;
+    top: 100%;
+    right: auto;
+    left: 50%;
+    transform: translate(-50%, 6px);
+    max-width: 90vw;
+  }
+  .card-tile:hover .card-popover { transform: translate(-50%, 6px); }
+}
+
 .search-row { flex-wrap: wrap; }
 .pc-strip {
   display: flex;

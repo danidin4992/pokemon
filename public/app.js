@@ -174,10 +174,11 @@ function fmtUsdCompact(cents) {
   return '$' + Math.round(d);
 }
 
-function renderSparkline(history, currentCents) {
+function renderSparkline(history, currentCents, opts = {}) {
   if (!Array.isArray(history) || history.length < 2) return '';
-  const W = 320, H = 90;
-  const PAD_L = 44, PAD_R = 52, PAD_T = 12, PAD_B = 22;
+  const W = opts.W || 320;
+  const H = opts.H || 90;
+  const PAD_L = opts.padL ?? 44, PAD_R = opts.padR ?? 52, PAD_T = opts.padT ?? 12, PAD_B = opts.padB ?? 22;
   const pts = history.filter((p) => p.price_cents > 0);
   if (pts.length < 2) return '';
   const values = pts.map((p) => p.price_cents);
@@ -307,6 +308,8 @@ function renderCardTile(s) {
     ? `<a class="card-pc-link" href="${escapeHtml(s.pricecharting_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open on PriceCharting">PC ↗</a>`
     : '';
 
+  const popover = s.pc_psa10_cents != null ? renderCardPopover(s) : '';
+
   return `
     <div class="card-tile ${s.active ? '' : 'inactive'} ${isFiltered ? 'active-filter' : ''}" data-id="${s.id}">
       ${imgHtml}
@@ -319,7 +322,38 @@ function renderCardTile(s) {
         <button data-action="toggle" title="${s.active ? 'Pause' : 'Resume'}">${s.active ? '⏸' : '▶'}</button>
         <button data-action="delete" class="danger" title="Delete">✕</button>
       </div>
+      ${popover}
     </div>`;
+}
+
+function renderCardPopover(s) {
+  const spark = renderSparkline(s.psa10_history, s.pc_psa10_cents, {
+    W: 460, H: 180, padL: 52, padR: 60, padT: 20, padB: 28,
+  });
+  const tiers = [
+    ['Raw', s.pc_loose_cents],
+    ['PSA 9', s.pc_grade9_cents],
+    ['PSA 10', s.pc_psa10_cents, 'psa10'],
+  ];
+  const chips = tiers
+    .map(
+      ([label, cents, cls]) =>
+        `<span class="pc-tier ${cls || ''}"><span class="label">${label}</span><span class="value">${escapeHtml(fmtMoney(cents))}</span></span>`
+    )
+    .join(' ');
+  const updated = s.pc_updated_at ? fmtAgo(s.pc_updated_at) : 'not fetched';
+  return `<div class="card-popover">
+    <div class="pop-head">
+      <div>
+        <div class="pop-heading">PriceCharting</div>
+        <div class="pop-product">${escapeHtml(s.pc_product_name || s.name)}</div>
+      </div>
+      <a class="pop-open" href="${escapeHtml(s.pricecharting_url || '')}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open ↗</a>
+    </div>
+    <div class="pop-tiers">${chips}</div>
+    <div class="pop-chart">${spark}</div>
+    <div class="pop-updated">Updated ${updated} · click card to filter auctions</div>
+  </div>`;
 }
 
 function renderPcStrip(s) {
