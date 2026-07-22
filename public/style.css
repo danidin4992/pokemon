@@ -626,6 +626,53 @@ h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; 
   flex-shrink: 0;
 }
 .modal-foot button { min-width: 160px; }
+
+/* Compact centered modal (for tier prefs, etc.) */
+.modal.center-modal .modal-panel {
+  height: auto;
+  max-height: calc(100vh - 80px);
+}
+.modal-panel-compact {
+  width: min(520px, 96vw);
+}
+.modal-head {
+  padding: 18px 22px 6px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.modal-head h2 { margin: 0 0 4px; font-size: 16px; text-transform: none; letter-spacing: 0; color: #1a1a1a; }
+.modal-hint { margin: 0 0 10px; color: #888; font-size: 12px; }
+.modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 18px;
+}
+.modal-foot-split {
+  justify-content: space-between;
+}
+.modal-foot-split button { min-width: 120px; }
+.modal-tier-row {
+  display: grid;
+  grid-template-columns: 20px 22px 14px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 6px;
+  border-bottom: 1px solid #f5f5f5;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.modal-tier-row:last-child { border-bottom: none; }
+.modal-tier-row:hover { background: #f7f8fa; }
+.modal-tier-row input { margin: 0; cursor: pointer; }
+.modal-tier-swatch {
+  width: 14px;
+  height: 4px;
+  border-radius: 2px;
+}
+.modal-tier-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1a1a1a;
+}
 .card-popover .pop-chart {
   border-top: 1px dashed #f0dcc4;
   padding-top: 10px;

@@ -548,7 +548,6 @@ function renderCardPopover(s) {
   }
   const spark = renderMultiSparkline(seriesByTier, { W: 500, H: 220, padL: 52, padR: 90, padT: 18, padB: 34 });
   const table = renderCardTierTable(s);
-  const prefs = renderTierPrefs(s);
   const updated = s.pc_updated_at ? fmtAgo(s.pc_updated_at) : 'not fetched';
   return `<div class="card-popover">
     <div class="pop-head">
@@ -558,10 +557,9 @@ function renderCardPopover(s) {
       </div>
       <a class="pop-open" href="${escapeHtml(s.pricecharting_url || '')}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open ↗</a>
     </div>
-    ${prefs}
     ${table}
     <div class="pop-chart">${spark}</div>
-    <div class="pop-updated">Updated ${updated} · click card to filter auctions</div>
+    <div class="pop-updated">Updated ${updated} · click card to filter auctions · configure tiers via 🎚 in the header</div>
   </div>`;
 }
 
@@ -1414,13 +1412,42 @@ document.querySelectorAll('[data-modal-close]').forEach((el) => {
   el.onclick = () => { document.getElementById('help-modal').hidden = true; };
 });
 
-// Tier preference checkbox changes — delegated so it works after each re-render
-document.body.addEventListener('change', (e) => {
-  const cb = e.target.closest('input[data-tier-pref]');
-  if (!cb) return;
-  setTierPref(cb.dataset.tierPref, cb.checked);
-  renderSearches(); // re-render popovers with the new pref applied
+// ================== Tiers preferences modal ==================
+// Held in a temporary object so we only commit to localStorage on Save.
+let tierPrefsDraft = null;
+
+function openTiersModal() {
+  tierPrefsDraft = { ...getTierPrefs() };
+  const body = document.getElementById('tiers-modal-body');
+  body.innerHTML = TIER_ORDER.map((t) => `
+    <label class="modal-tier-row" data-tier-key="${t.tier}">
+      <input type="checkbox" data-tier-draft="${t.tier}" ${tierPrefsDraft[t.tier] !== false ? 'checked' : ''}>
+      ${tierRankBadge(t)}
+      <span class="modal-tier-swatch" style="background:${TIER_COLORS[t.tier]?.line || '#999'}"></span>
+      <span class="modal-tier-name">${t.label}</span>
+    </label>`).join('');
+  document.getElementById('tiers-modal').hidden = false;
+}
+function closeTiersModal() {
+  document.getElementById('tiers-modal').hidden = true;
+  tierPrefsDraft = null;
+}
+document.getElementById('toggle-tiers').onclick = openTiersModal;
+document.querySelectorAll('[data-tiers-cancel]').forEach((el) => {
+  el.onclick = closeTiersModal;
 });
+document.getElementById('tiers-modal-body').addEventListener('change', (e) => {
+  const cb = e.target.closest('input[data-tier-draft]');
+  if (!cb || !tierPrefsDraft) return;
+  tierPrefsDraft[cb.dataset.tierDraft] = cb.checked;
+});
+document.getElementById('tiers-save').onclick = () => {
+  if (!tierPrefsDraft) return;
+  for (const [k, v] of Object.entries(tierPrefsDraft)) setTierPref(k, v);
+  toast('Tier preferences saved');
+  closeTiersModal();
+  renderSearches();
+};
 
 loadRecipients();
 loadSettings();

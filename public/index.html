@@ -14,6 +14,7 @@
         <span id="last-run" class="muted">—</span>
         <span id="ebay-usage" class="ebay-usage" title="eBay Browse API calls today"></span>
         <div id="recipient-picker" class="recipient-picker"></div>
+        <button id="toggle-tiers" class="secondary" title="Choose which grading tiers to display">🎚 Tiers</button>
         <button id="toggle-help" class="secondary" title="Grading grades reference">📖 עזר</button>
         <button id="toggle-settings" class="secondary" title="Global keyword filters">⚙ Filters</button>
         <button id="run-now" class="primary">Run now</button>
@@ -65,6 +66,21 @@
 
     </div>
   </main>
+
+  <div id="tiers-modal" class="modal center-modal" hidden>
+    <div class="modal-backdrop" data-tiers-cancel></div>
+    <div class="modal-panel modal-panel-compact">
+      <div class="modal-head">
+        <h2>Tier preferences</h2>
+        <p class="modal-hint">Choose which grading tiers appear on the tier table and the price chart. Applies to every card.</p>
+      </div>
+      <div class="modal-body" id="tiers-modal-body"></div>
+      <div class="modal-foot modal-foot-split">
+        <button type="button" class="secondary" data-tiers-cancel>Cancel</button>
+        <button type="button" class="primary" id="tiers-save">Save</button>
+      </div>
+    </div>
+  </div>
 
   <div id="help-modal" class="modal" hidden>
     <div class="modal-backdrop" data-modal-close></div>
