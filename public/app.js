@@ -412,17 +412,19 @@ function renderMiniSparkline(history) {
   </svg>`;
 }
 
-// All tiers we display, mapped from field name → tier key + label + class
+// All tiers we display, mapped from field name → tier key + label + class.
+// The `rank` and `rankColor` match the help table (grading-scrutiny-table.html)
+// so the numbered badge next to each price stays in sync with the reference.
 const TIER_ORDER = [
-  { key: 'pc_bgs10_black_cents',     tier: 'bgs10_black',     label: 'BGS Black Label 10', cls: 'bgs10-black' },
-  { key: 'pc_tag10_pristine_cents',  tier: 'tag10_pristine',  label: 'TAG 10 Pristine',    cls: 'tag10-pristine' },
-  { key: 'pc_bgs10_cents',           tier: 'bgs10',           label: 'BGS 10',             cls: 'bgs10' },
-  { key: 'pc_cgc_pristine_10_cents', tier: 'cgc_pristine_10', label: 'CGC Pristine 10',    cls: 'cgc-pristine' },
-  { key: 'pc_psa10_cents',           tier: 'psa10',           label: 'PSA 10',             cls: 'psa10' },
-  { key: 'pc_tag10_cents',           tier: 'tag10',           label: 'TAG 10 Gem Mint',    cls: 'tag10' },
-  { key: 'pc_cgc10_cents',           tier: 'cgc10',           label: 'CGC 10 Gem Mint',    cls: 'cgc10' },
-  { key: 'pc_ace10_cents',           tier: 'ace10',           label: 'ACE 10',             cls: 'ace10' },
-  { key: 'pc_sgc10_cents',           tier: 'sgc10',           label: 'SGC 10',             cls: 'sgc10' },
+  { key: 'pc_bgs10_black_cents',     tier: 'bgs10_black',     label: 'BGS Black Label 10', cls: 'bgs10-black',    rank: 1, rankColor: '#e5484d' },
+  { key: 'pc_tag10_pristine_cents',  tier: 'tag10_pristine',  label: 'TAG 10 Pristine',    cls: 'tag10-pristine', rank: 2, rankColor: '#f0743f' },
+  { key: 'pc_ace10_cents',           tier: 'ace10',           label: 'ACE 10',             cls: 'ace10',          rank: 3, rankColor: '#e8b923' },
+  { key: 'pc_bgs10_cents',           tier: 'bgs10',           label: 'BGS 10 Pristine',    cls: 'bgs10',          rank: 4, rankColor: '#c9c14a' },
+  { key: 'pc_cgc_pristine_10_cents', tier: 'cgc_pristine_10', label: 'CGC Pristine 10',    cls: 'cgc-pristine',   rank: 5, rankColor: '#a7b356' },
+  { key: 'pc_tag10_cents',           tier: 'tag10',           label: 'TAG 10 Gem Mint',    cls: 'tag10',          rank: 6, rankColor: '#84a86a' },
+  { key: 'pc_cgc10_cents',           tier: 'cgc10',           label: 'CGC 10 Gem Mint',    cls: 'cgc10',          rank: 7, rankColor: '#4d90cf' },
+  { key: 'pc_psa10_cents',           tier: 'psa10',           label: 'PSA 10',             cls: 'psa10',          rank: 8, rankColor: '#3b82f6' },
+  { key: 'pc_sgc10_cents',           tier: 'sgc10',           label: 'SGC 10',             cls: 'sgc10',          rank: null, rankColor: '#7b7b7b' },
 ];
 
 // Order tiers by current price, highest first.
@@ -442,8 +444,14 @@ function renderCardTierChips(s, opts = {}) {
     .join(' ');
 }
 
-// Vertical table-like tier list — one tier per row, label left, price right.
-// Filter tiers by preferences (checkboxes) — if none selected shows a hint.
+function tierRankBadge(t) {
+  if (t.rank == null) {
+    return `<span class="tier-rank tier-rank-none" title="Not in the grading reference table">·</span>`;
+  }
+  return `<span class="tier-rank" style="background:${t.rankColor}" title="Rank #${t.rank} in the grading reference (see 📖 עזר)">${t.rank}</span>`;
+}
+
+// Vertical table-like tier list — one tier per row, label left, numbered badge + price right.
 function renderCardTierTable(s) {
   const tiers = orderedTiers(s).filter((t) => isTierOn(t.tier));
   if (tiers.length === 0) {
@@ -453,6 +461,7 @@ function renderCardTierTable(s) {
     ${tiers.map((t) => `
       <div class="tier-row ${t.cls}">
         <span class="tier-label">${t.label}</span>
+        ${tierRankBadge(t)}
         <span class="tier-price">${escapeHtml(fmtMoney(s[t.key]))}</span>
       </div>`).join('')}
   </div>`;
@@ -467,6 +476,7 @@ function renderTierPrefs(s) {
       ${anyTierValues.map((t) => `
         <label class="tier-pref-row">
           <input type="checkbox" data-tier-pref="${t.tier}" ${isTierOn(t.tier) ? 'checked' : ''}>
+          ${tierRankBadge(t)}
           <span class="tier-pref-swatch" style="background:${TIER_COLORS[t.tier]?.line || '#999'}"></span>
           <span class="tier-pref-name">${t.label}</span>
           <span class="tier-pref-value">${escapeHtml(fmtMoney(s[t.key]))}</span>

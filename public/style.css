@@ -437,8 +437,9 @@ h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; 
   overflow: hidden;
 }
 .card-popover .tier-row {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
   align-items: center;
   padding: 8px 12px;
   font-size: 13px;
@@ -453,6 +454,33 @@ h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; 
   font-weight: 800;
   font-size: 15px;
   font-variant-numeric: tabular-nums;
+}
+
+.tier-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: #0f1420;
+  font-weight: 800;
+  font-size: 12px;
+  font-family: system-ui;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  flex-shrink: 0;
+}
+.tier-rank-none {
+  background: #e3e5e8;
+  color: #888;
+  box-shadow: none;
+  font-weight: 600;
+}
+.tier-pref-row .tier-rank {
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+  border-radius: 5px;
 }
 .card-popover .tier-row.psa10 { background: #fffbef; }
 .card-popover .tier-row.psa10 .tier-label,
@@ -506,7 +534,7 @@ h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; 
 }
 .tier-pref-row {
   display: grid;
-  grid-template-columns: 16px 10px 1fr auto;
+  grid-template-columns: 16px 22px 10px 1fr auto;
   gap: 8px;
   align-items: center;
   padding: 4px 0;
