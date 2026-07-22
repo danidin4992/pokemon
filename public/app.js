@@ -135,7 +135,6 @@ async function loadSearches() {
   searches = await res.json();
   renderSearches();
   renderSearchFilter();
-  renderRarityLeaderboard();
 }
 
 function fmtMoney(cents) {
@@ -410,12 +409,18 @@ function renderCardTierTable(s) {
   </div>`;
 }
 
-function renderCardTile(s) {
+function renderCardTile(s, opts = {}) {
   const psa10 = s.pc_psa10_cents != null ? fmtMoney(s.pc_psa10_cents) : '';
   const imgHtml = s.pc_image_url
     ? `<img class="card-image" src="${escapeHtml(s.pc_image_url)}" alt="${escapeHtml(s.name)}" loading="lazy" onerror="this.classList.add('failed');this.replaceWith(Object.assign(document.createElement('div'),{className:'card-image placeholder',textContent:'🎴'}))">`
     : `<div class="card-image placeholder">🎴</div>`;
   const isFiltered = currentSearchFilters.has(s.id);
+  const rank = opts.rank;
+  const rankCls = rank === 1 ? 'top1' : rank === 2 ? 'top2' : rank === 3 ? 'top3' : '';
+  const rankBadge = rank ? `<span class="card-rank ${rankCls}">#${rank}</span>` : '';
+  const oddsLine = s.pack_odds
+    ? `<div class="card-odds-line">1 : ${s.pack_odds.toLocaleString('en-US')} packs</div>`
+    : '';
 
   // Trend snippet + sparkline (only if we have history)
   let trendBar = '';
@@ -442,8 +447,10 @@ function renderCardTile(s) {
   const tierMini = renderCardTierChips(s, { small: true });
   return `
     <div class="card-tile ${s.active ? '' : 'inactive'} ${isFiltered ? 'active-filter' : ''}" data-id="${s.id}">
+      ${rankBadge}
       ${imgHtml}
       <div class="card-name">${escapeHtml(s.name)}</div>
+      ${oddsLine}
       ${tierMini ? `<div class="card-tiers">${tierMini}</div>` : ''}
       ${trendBar}
       ${pcLink}
@@ -537,22 +544,26 @@ function initEditStripTags(row, s) {
 function renderSearches() {
   const list = $('#searches-list');
   if (searches.length === 0) {
-    list.innerHTML = '<div class="empty" style="grid-column:1/-1">No cards yet. Add one above.</div>';
+    list.innerHTML = '<div class="empty">No cards yet. Add one above.</div>';
     return;
   }
-  list.innerHTML = searches
-    .map((s) => renderCardTile(s))
-    .join('');
-  // Show edit strips for currently-editing cards below the grid
-  const editing = searches.filter((s) => editingSearchId.has(s.id));
-  if (editing.length) {
-    const editHtml = editing.map((s) => `
-      <div class="search-row" data-id="${s.id}" style="grid-column:1/-1;background:white;border:1px solid #e3e5e8;border-radius:6px;padding:10px 14px">
-        <div style="font-weight:600;margin-bottom:6px">Editing: ${escapeHtml(s.name)}</div>
-        ${renderEditStrip(s)}
-      </div>`).join('');
-    list.insertAdjacentHTML('beforeend', editHtml);
+  // Split: cards with pack_odds ranked by rarity (highest odds first),
+  // cards without pack_odds at the bottom in original order.
+  const ranked = searches
+    .filter((s) => s.pack_odds && s.pack_odds > 0)
+    .sort((a, b) => b.pack_odds - a.pack_odds);
+  const unranked = searches.filter((s) => !s.pack_odds || s.pack_odds <= 0);
+
+  let html = '';
+  if (ranked.length) {
+    html += `<div class="rank-header">🏆 Ranked by rarity</div>`;
+    html += ranked.map((s, i) => renderCardTile(s, { rank: i + 1 })).join('');
   }
+  if (unranked.length) {
+    html += `<div class="rank-header">Unranked · Add pack odds</div>`;
+    html += unranked.map((s) => renderCardTile(s)).join('');
+  }
+  list.innerHTML = html;
 
   perSearchTagInputs.clear();
   // Wire up card tiles
@@ -1315,52 +1326,6 @@ document.getElementById('drawer-save').onclick = async () => {
     btn.textContent = orig;
   }
 };
-
-// ================== Rarity leaderboard ==================
-function renderRarityLeaderboard() {
-  const container = document.getElementById('rarity-list');
-  if (!container) return;
-  const withOdds = searches.filter((s) => s.pack_odds && s.pack_odds > 0);
-  if (withOdds.length === 0) {
-    container.innerHTML = `<div class="rarity-empty">No pack-odds data yet.<br>Edit a card to add.</div>`;
-    return;
-  }
-  const rarest = [...withOdds].sort((a, b) => b.pack_odds - a.pack_odds);
-  const common = [...withOdds].sort((a, b) => a.pack_odds - b.pack_odds);
-  const row = (s) => {
-    const img = s.pc_image_url
-      ? `<img src="${escapeHtml(s.pc_image_url)}" alt="" loading="lazy">`
-      : `<div style="width:32px;height:44px;background:#f0f0f0;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:16px">🎴</div>`;
-    return `<div class="rarity-row" data-id="${s.id}" title="${escapeHtml(s.name)}">
-      ${img}
-      <span class="rarity-name">${escapeHtml(s.name)}</span>
-      <span class="rarity-odds">1 : ${s.pack_odds.toLocaleString('en-US')}</span>
-    </div>`;
-  };
-  const rarestHtml = rarest.slice(0, 10).map(row).join('');
-  const commonHtml = common.slice(0, 10).map(row).join('');
-  container.innerHTML = `
-    <div class="rarity-group">
-      <div class="rarity-group-title">🔥 Rarest first</div>
-      ${rarestHtml}
-    </div>
-    ${rarest.length > 3 ? `
-      <div class="rarity-group">
-        <div class="rarity-group-title">📦 Most common</div>
-        ${commonHtml}
-      </div>` : ''}
-  `;
-  container.querySelectorAll('.rarity-row').forEach((row) => {
-    row.onclick = () => {
-      const id = parseInt(row.dataset.id);
-      if (currentSearchFilters.has(id)) currentSearchFilters.delete(id);
-      else currentSearchFilters.add(id);
-      syncFilterDropdown();
-      renderSearches();
-      renderListings();
-    };
-  });
-}
 
 loadRecipients();
 loadSettings();
