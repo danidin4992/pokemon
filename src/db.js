@@ -164,6 +164,7 @@ function migrate() {
   add('required_keywords', 'TEXT'); // JSON array of strings
   add('forbidden_keywords', 'TEXT'); // JSON array of strings
   add('pc_image_url', 'TEXT'); // PriceCharting product image
+  add('pack_odds', 'INTEGER'); // 1 in N packs (manual research)
 
   // Migrate notifications: add lead_seconds column + composite UNIQUE.
   // Rebuild table if old schema (UNIQUE on listing_id alone) is detected.
@@ -271,7 +272,13 @@ export function createSearch({ name, url, pricecharting_url, required_keywords, 
   return info.lastInsertRowid;
 }
 
-export function updateSearch(id, { name, url, active, pricecharting_url, required_keywords, forbidden_keywords }) {
+export function updateSearch(id, { name, url, active, pricecharting_url, required_keywords, forbidden_keywords, pack_odds }) {
+  // pack_odds explicit-null-clears requires special handling: undefined = keep, null = clear, number = set
+  const packOddsPart = pack_odds === undefined
+    ? 'pack_odds = pack_odds'
+    : pack_odds === null
+      ? 'pack_odds = NULL'
+      : `pack_odds = ${parseInt(pack_odds) || null}`;
   db.prepare(
     `UPDATE searches SET
        name = COALESCE(?, name),
@@ -279,7 +286,8 @@ export function updateSearch(id, { name, url, active, pricecharting_url, require
        active = COALESCE(?, active),
        pricecharting_url = COALESCE(?, pricecharting_url),
        required_keywords = COALESCE(?, required_keywords),
-       forbidden_keywords = COALESCE(?, forbidden_keywords)
+       forbidden_keywords = COALESCE(?, forbidden_keywords),
+       ${packOddsPart}
      WHERE id = ?`
   ).run(
     name ?? null,

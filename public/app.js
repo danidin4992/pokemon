@@ -135,6 +135,7 @@ async function loadSearches() {
   searches = await res.json();
   renderSearches();
   renderSearchFilter();
+  renderRarityLeaderboard();
 }
 
 function fmtMoney(cents) {
@@ -500,6 +501,7 @@ function safeParseJsonArray(v) {
 }
 
 const perSearchTagInputs = new Map(); // search id -> { required, forbidden }
+let drawerTagInputs = null; // { required, forbidden } for the currently open drawer
 
 function renderEditStrip(s) {
   if (!editingSearchId.has(s.id)) return '';
@@ -571,9 +573,7 @@ function renderSearches() {
     });
     tile.querySelector('[data-action="edit"]').onclick = (e) => {
       e.stopPropagation();
-      if (editingSearchId.has(id)) editingSearchId.delete(id);
-      else editingSearchId.add(id);
-      renderSearches();
+      openEditDrawer(id);
     };
     tile.querySelector('[data-action="toggle"]').onclick = async (e) => {
       e.stopPropagation();
@@ -1221,6 +1221,145 @@ if (clearBtn) {
     renderSearches();
     renderListings();
   };
+}
+
+// ================== Edit drawer ==================
+function openEditDrawer(id) {
+  const s = searches.find((x) => x.id === id);
+  if (!s) return;
+  const reqTags = safeParseJsonArray(s.required_keywords);
+  const forTags = safeParseJsonArray(s.forbidden_keywords);
+  const body = document.getElementById('drawer-body');
+  const title = document.getElementById('drawer-title');
+  title.textContent = 'Edit · ' + s.name;
+  body.innerHTML = `
+    <div class="edit-row">
+      <label>Card name</label>
+      <input data-edit="name" value="${escapeHtml(s.name)}">
+    </div>
+    <div class="edit-row">
+      <label>eBay search URL</label>
+      <input data-edit="url" value="${escapeHtml(s.url)}">
+    </div>
+    <div class="edit-row">
+      <label>PriceCharting URL <span class="hint">optional</span></label>
+      <input data-edit="pricecharting_url" value="${escapeHtml(s.pricecharting_url || '')}" placeholder="https://www.pricecharting.com/game/...">
+    </div>
+    <div class="edit-row">
+      <label>Pack odds <span class="hint">1 in N packs (manual research)</span></label>
+      <div class="edit-row-inline">
+        <span class="prefix">1 in</span>
+        <input type="number" min="1" step="1" data-edit="pack_odds" value="${s.pack_odds ?? ''}" placeholder="e.g. 250">
+        <span class="prefix">packs</span>
+      </div>
+    </div>
+    <div class="edit-row">
+      <label>Required keywords <span class="hint">any-of · title must contain at least one</span></label>
+      <div class="tag-input" data-drawer-tags="required"></div>
+    </div>
+    <div class="edit-row">
+      <label>Forbidden keywords <span class="hint">title must contain none</span></label>
+      <div class="tag-input forbidden" data-drawer-tags="forbidden"></div>
+    </div>
+  `;
+  const reqEl = body.querySelector('[data-drawer-tags="required"]');
+  const forEl = body.querySelector('[data-drawer-tags="forbidden"]');
+  drawerTagInputs = {
+    required: createTagInput(reqEl, reqTags, 'e.g. Charizard'),
+    forbidden: createTagInput(forEl, forTags, 'e.g. proxy'),
+    id,
+  };
+  document.getElementById('edit-drawer').hidden = false;
+}
+function closeEditDrawer() {
+  document.getElementById('edit-drawer').hidden = true;
+  drawerTagInputs = null;
+}
+document.querySelectorAll('[data-drawer-close]').forEach((el) => {
+  el.onclick = closeEditDrawer;
+});
+document.getElementById('drawer-save').onclick = async () => {
+  const body = document.getElementById('drawer-body');
+  const id = drawerTagInputs.id;
+  const get = (k) => body.querySelector(`[data-edit="${k}"]`).value.trim();
+  const packOddsRaw = get('pack_odds');
+  const payload = {
+    name: get('name'),
+    url: get('url'),
+    pricecharting_url: get('pricecharting_url') || null,
+    pack_odds: packOddsRaw === '' ? null : parseInt(packOddsRaw),
+    required_keywords: drawerTagInputs.required.get(),
+    forbidden_keywords: drawerTagInputs.forbidden.get(),
+  };
+  const btn = document.getElementById('drawer-save');
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = 'Saving…';
+  try {
+    const res = await fetch(`/api/searches/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) {
+      toast('Saved');
+      closeEditDrawer();
+      await loadSearches();
+      await loadListings();
+    } else {
+      const e = await res.json();
+      toast(e.error || 'Save failed');
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = orig;
+  }
+};
+
+// ================== Rarity leaderboard ==================
+function renderRarityLeaderboard() {
+  const container = document.getElementById('rarity-list');
+  if (!container) return;
+  const withOdds = searches.filter((s) => s.pack_odds && s.pack_odds > 0);
+  if (withOdds.length === 0) {
+    container.innerHTML = `<div class="rarity-empty">No pack-odds data yet.<br>Edit a card to add.</div>`;
+    return;
+  }
+  const rarest = [...withOdds].sort((a, b) => b.pack_odds - a.pack_odds);
+  const common = [...withOdds].sort((a, b) => a.pack_odds - b.pack_odds);
+  const row = (s) => {
+    const img = s.pc_image_url
+      ? `<img src="${escapeHtml(s.pc_image_url)}" alt="" loading="lazy">`
+      : `<div style="width:32px;height:44px;background:#f0f0f0;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:16px">🎴</div>`;
+    return `<div class="rarity-row" data-id="${s.id}" title="${escapeHtml(s.name)}">
+      ${img}
+      <span class="rarity-name">${escapeHtml(s.name)}</span>
+      <span class="rarity-odds">1 : ${s.pack_odds.toLocaleString('en-US')}</span>
+    </div>`;
+  };
+  const rarestHtml = rarest.slice(0, 10).map(row).join('');
+  const commonHtml = common.slice(0, 10).map(row).join('');
+  container.innerHTML = `
+    <div class="rarity-group">
+      <div class="rarity-group-title">🔥 Rarest first</div>
+      ${rarestHtml}
+    </div>
+    ${rarest.length > 3 ? `
+      <div class="rarity-group">
+        <div class="rarity-group-title">📦 Most common</div>
+        ${commonHtml}
+      </div>` : ''}
+  `;
+  container.querySelectorAll('.rarity-row').forEach((row) => {
+    row.onclick = () => {
+      const id = parseInt(row.dataset.id);
+      if (currentSearchFilters.has(id)) currentSearchFilters.delete(id);
+      else currentSearchFilters.add(id);
+      syncFilterDropdown();
+      renderSearches();
+      renderListings();
+    };
+  });
 }
 
 loadRecipients();

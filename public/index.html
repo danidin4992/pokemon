@@ -64,8 +64,29 @@
         </div>
         <div id="listings-list"></div>
       </section>
+
+      <aside id="rarity-section">
+        <h2>Rarity leaderboard</h2>
+        <p class="rarity-hint">Cards you've entered pack odds for — 1 in <em>N</em> packs. Edit a card to add or update its odds.</p>
+        <div id="rarity-list"></div>
+      </aside>
     </div>
   </main>
+
+  <div id="edit-drawer" class="drawer" hidden>
+    <div class="drawer-backdrop" data-drawer-close></div>
+    <div class="drawer-panel" role="dialog" aria-label="Edit card">
+      <div class="drawer-head">
+        <h2 id="drawer-title">Edit card</h2>
+        <button type="button" class="drawer-close" data-drawer-close aria-label="Close">✕</button>
+      </div>
+      <div class="drawer-body" id="drawer-body"></div>
+      <div class="drawer-foot">
+        <button type="button" class="secondary" data-drawer-close>Cancel</button>
+        <button type="button" class="primary" id="drawer-save">Save changes</button>
+      </div>
+    </div>
+  </div>
 
   <div id="toast"></div>
   <script src="/app.js"></script>
