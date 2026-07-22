@@ -365,6 +365,41 @@ h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; 
   margin-bottom: 12px;
   flex-wrap: wrap;
 }
+.card-popover .pop-tier-table {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
+  border: 1px solid #e3e5e8;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.card-popover .tier-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  font-size: 13px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.card-popover .tier-row:last-child { border-bottom: none; }
+.card-popover .tier-row .tier-label {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.card-popover .tier-row .tier-price {
+  font-weight: 800;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.card-popover .tier-row.psa10 { background: #fffbef; }
+.card-popover .tier-row.psa10 .tier-label,
+.card-popover .tier-row.psa10 .tier-price { color: #b45f00; }
+.card-popover .tier-row.cgc-pristine { background: #f4f8fc; }
+.card-popover .tier-row.cgc-pristine .tier-label,
+.card-popover .tier-row.cgc-pristine .tier-price { color: #0053a0; }
+.card-popover .tier-row.ace10 { background: #f2f9f3; }
+.card-popover .tier-row.ace10 .tier-label,
+.card-popover .tier-row.ace10 .tier-price { color: #1b7a3d; }
 .card-popover .pop-chart {
   border-top: 1px dashed #f0dcc4;
   padding-top: 10px;

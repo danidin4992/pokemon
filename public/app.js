@@ -374,20 +374,33 @@ function renderMiniSparkline(history) {
   </svg>`;
 }
 
+// Fixed display order: PSA 10 → CGC Pristine 10 → ACE 10
+const TIER_ORDER = [
+  { key: 'pc_psa10_cents',           label: 'PSA 10',          cls: 'psa10' },
+  { key: 'pc_cgc_pristine_10_cents', label: 'CGC Pristine 10', cls: 'cgc-pristine' },
+  { key: 'pc_ace10_cents',           label: 'ACE 10',          cls: 'ace10' },
+];
+
 function renderCardTierChips(s, opts = {}) {
   const small = opts.small;
-  const tiers = [
-    { key: 'pc_cgc_pristine_10_cents', label: 'CGC PRISTINE 10', cls: 'cgc-pristine' },
-    { key: 'pc_psa10_cents', label: 'PSA 10', cls: 'psa10' },
-    { key: 'pc_ace10_cents', label: 'ACE 10', cls: 'ace10' },
-  ];
-  return tiers
+  return TIER_ORDER
     .filter((t) => s[t.key] != null)
     .map(
       (t) =>
         `<span class="pc-tier ${t.cls}${small ? ' small' : ''}"><span class="label">${t.label}</span><span class="value">${escapeHtml(fmtMoney(s[t.key]))}</span></span>`
     )
     .join(' ');
+}
+
+// Vertical table-like tier list — one tier per row, label left, price right.
+function renderCardTierTable(s) {
+  return `<div class="pop-tier-table">
+    ${TIER_ORDER.filter((t) => s[t.key] != null).map((t) => `
+      <div class="tier-row ${t.cls}">
+        <span class="tier-label">${t.label}</span>
+        <span class="tier-price">${escapeHtml(fmtMoney(s[t.key]))}</span>
+      </div>`).join('')}
+  </div>`;
 }
 
 function renderCardTile(s) {
@@ -442,7 +455,7 @@ function renderCardPopover(s) {
     ace10: s.ace10_history || [],
     cgc_pristine_10: s.cgc_pristine_10_history || [],
   }, { W: 460, H: 200, padL: 52, padR: 60, padT: 18, padB: 34 });
-  const chips = renderCardTierChips(s);
+  const table = renderCardTierTable(s);
   const updated = s.pc_updated_at ? fmtAgo(s.pc_updated_at) : 'not fetched';
   return `<div class="card-popover">
     <div class="pop-head">
@@ -452,7 +465,7 @@ function renderCardPopover(s) {
       </div>
       <a class="pop-open" href="${escapeHtml(s.pricecharting_url || '')}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open ↗</a>
     </div>
-    <div class="pop-tiers">${chips}</div>
+    ${table}
     <div class="pop-chart">${spark}</div>
     <div class="pop-updated">Updated ${updated} · click card to filter auctions</div>
   </div>`;
