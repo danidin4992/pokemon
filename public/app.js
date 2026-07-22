@@ -281,6 +281,22 @@ function renderMiniSparkline(history) {
   </svg>`;
 }
 
+function renderCardTierChips(s, opts = {}) {
+  const small = opts.small;
+  const tiers = [
+    { key: 'pc_cgc_pristine_10_cents', label: 'CGC PRISTINE 10', cls: 'cgc-pristine' },
+    { key: 'pc_psa10_cents', label: 'PSA 10', cls: 'psa10' },
+    { key: 'pc_ace10_cents', label: 'ACE 10', cls: 'ace10' },
+  ];
+  return tiers
+    .filter((t) => s[t.key] != null)
+    .map(
+      (t) =>
+        `<span class="pc-tier ${t.cls}${small ? ' small' : ''}"><span class="label">${t.label}</span><span class="value">${escapeHtml(fmtMoney(s[t.key]))}</span></span>`
+    )
+    .join(' ');
+}
+
 function renderCardTile(s) {
   const psa10 = s.pc_psa10_cents != null ? fmtMoney(s.pc_psa10_cents) : '';
   const imgHtml = s.pc_image_url
@@ -310,11 +326,12 @@ function renderCardTile(s) {
 
   const popover = s.pc_psa10_cents != null ? renderCardPopover(s) : '';
 
+  const tierMini = renderCardTierChips(s, { small: true });
   return `
     <div class="card-tile ${s.active ? '' : 'inactive'} ${isFiltered ? 'active-filter' : ''}" data-id="${s.id}">
       ${imgHtml}
       <div class="card-name">${escapeHtml(s.name)}</div>
-      ${psa10 ? `<div class="card-psa10">PSA 10 ${escapeHtml(psa10)}</div>` : ''}
+      ${tierMini ? `<div class="card-tiers">${tierMini}</div>` : ''}
       ${trendBar}
       ${pcLink}
       <div class="card-controls">
@@ -330,17 +347,7 @@ function renderCardPopover(s) {
   const spark = renderSparkline(s.psa10_history, s.pc_psa10_cents, {
     W: 460, H: 180, padL: 52, padR: 60, padT: 20, padB: 28,
   });
-  const tiers = [
-    ['Raw', s.pc_loose_cents],
-    ['PSA 9', s.pc_grade9_cents],
-    ['PSA 10', s.pc_psa10_cents, 'psa10'],
-  ];
-  const chips = tiers
-    .map(
-      ([label, cents, cls]) =>
-        `<span class="pc-tier ${cls || ''}"><span class="label">${label}</span><span class="value">${escapeHtml(fmtMoney(cents))}</span></span>`
-    )
-    .join(' ');
+  const chips = renderCardTierChips(s);
   const updated = s.pc_updated_at ? fmtAgo(s.pc_updated_at) : 'not fetched';
   return `<div class="card-popover">
     <div class="pop-head">
@@ -351,7 +358,10 @@ function renderCardPopover(s) {
       <a class="pop-open" href="${escapeHtml(s.pricecharting_url || '')}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open ↗</a>
     </div>
     <div class="pop-tiers">${chips}</div>
-    <div class="pop-chart">${spark}</div>
+    <div class="pop-chart">
+      <div class="pop-chart-label">PSA 10 · 6mo</div>
+      ${spark}
+    </div>
     <div class="pop-updated">Updated ${updated} · click card to filter auctions</div>
   </div>`;
 }
@@ -592,11 +602,43 @@ function renderListings() {
     .join('');
 }
 
-function renderMarketInline(bidCents, marketCents) {
+// Look at a listing title and figure out which grading tier it's referring to.
+// Order matters — check the most specific patterns first.
+function detectTier(title) {
+  if (!title) return 'psa10';
+  const t = title.toUpperCase();
+  if (/\bCGC\s*(?:GEM\s*MINT\s*)?(?:PRISTINE|PERFECT)\s*10\b/.test(t) ||
+      /\bCGC\s*10\s*PRISTINE\b/.test(t) ||
+      /\bPRISTINE\s*(?:GEM\s*MINT\s*)?10\b/.test(t))
+    return 'cgc_pristine_10';
+  if (/\bACE\s*10\b/.test(t) || /\bACE\s*(?:GEM\s*MINT\s*)?10\b/.test(t))
+    return 'ace10';
+  if (/\bPSA\s*10\b/.test(t)) return 'psa10';
+  // Fallbacks — a card labeled just "CGC 10" or "BGS 10" isn't Pristine.
+  // Compare it to PSA 10 as best-available reference.
+  return 'psa10';
+}
+
+function marketCentsForTier(l, tier) {
+  if (tier === 'cgc_pristine_10') return l.search_pc_cgc_pristine_10_cents ?? l.search_pc_psa10_cents ?? null;
+  if (tier === 'ace10') return l.search_pc_ace10_cents ?? l.search_pc_psa10_cents ?? null;
+  return l.search_pc_psa10_cents ?? null;
+}
+
+const TIER_LABELS = {
+  psa10: 'PSA 10',
+  ace10: 'ACE 10',
+  cgc_pristine_10: 'CGC Pristine 10',
+};
+
+function renderMarketInline(bidCents, l) {
+  const tier = detectTier(l.title);
+  const marketCents = marketCentsForTier(l, tier);
   if (marketCents == null || marketCents === 0) return '';
   const marketStr = fmtUsd(marketCents);
+  const tierLabel = TIER_LABELS[tier] || 'PSA 10';
   if (bidCents == null) {
-    return `<div class="market-inline"><span class="market-label">Market ${escapeHtml(marketStr)}</span></div>`;
+    return `<div class="market-inline"><span class="market-label">${escapeHtml(tierLabel)} ${escapeHtml(marketStr)}</span></div>`;
   }
   const diff = bidCents - marketCents;
   const pct = Math.round((diff / marketCents) * 100);
@@ -604,7 +646,7 @@ function renderMarketInline(bidCents, marketCents) {
   const sign = diff > 0 ? '+' : (diff < 0 ? '−' : '');
   const abs = fmtUsd(Math.abs(diff));
   return `<div class="market-inline">
-    <span class="market-label">Market ${escapeHtml(marketStr)}</span>
+    <span class="market-label">${escapeHtml(tierLabel)} ${escapeHtml(marketStr)}</span>
     <span class="market-diff ${cls}">${sign}${escapeHtml(abs)} · ${sign}${Math.abs(pct)}%</span>
   </div>`;
 }
@@ -667,7 +709,7 @@ function renderListingRow(l) {
       ${renderNotifyBox(l)}
       <div class="price-block">
         <div class="price" title="${escapeHtml(l.price_text || '')}" data-role="bid">${escapeHtml(bidCents != null ? fmtUsd(bidCents) : l.price_text || '—')}</div>
-        ${renderMarketInline(bidCents, marketCents)}
+        ${renderMarketInline(bidCents, l)}
         <div class="bids" data-role="bids">${l.bid_count ?? 0} bids</div>
         <div class="time-left" data-role="time-left">${fmtRelativeTime(l.ends_at)}</div>
         ${renderEndTimes(l.ends_at)}

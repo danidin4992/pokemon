@@ -237,11 +237,7 @@ h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; 
   height: 30px;
   overflow: hidden;
 }
-.card-tile .card-psa10 {
-  font-size: 12px;
-  color: #b45f00;
-  font-weight: 700;
-}
+.card-tile .card-psa10 { display: none; }
 .card-tile .card-controls {
   position: absolute;
   top: 4px;
@@ -432,6 +428,35 @@ h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; 
 .pc-tier .value { font-weight: 700; color: #1a1a1a; }
 .pc-tier.psa10 { background: #fff7e6; border-color: #f7d57a; }
 .pc-tier.psa10 .value { color: #b45f00; }
+.pc-tier.cgc-pristine { background: #eef4fb; border-color: #a9c5e6; }
+.pc-tier.cgc-pristine .value { color: #0053a0; }
+.pc-tier.cgc-pristine .label { color: #0053a0; }
+.pc-tier.ace10 { background: #eef8ee; border-color: #a8d4a8; }
+.pc-tier.ace10 .value { color: #1b7a3d; }
+.pc-tier.ace10 .label { color: #1b7a3d; }
+.pc-tier.small {
+  padding: 2px 6px;
+  font-size: 10px;
+  gap: 3px;
+}
+.pc-tier.small .label { font-size: 9px; }
+.pc-tier.small .value { font-size: 11px; }
+
+.card-tiers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  justify-content: center;
+  margin-top: 2px;
+}
+.card-popover .pop-chart-label {
+  font-size: 10px;
+  color: #888;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
 .pc-strip .pc-link {
   color: #0053a0;
   text-decoration: none;

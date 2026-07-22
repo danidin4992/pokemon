@@ -139,6 +139,8 @@ function migrate() {
   add('pc_grade9_cents', 'INTEGER');
   add('pc_grade9_5_cents', 'INTEGER');
   add('pc_psa10_cents', 'INTEGER');
+  add('pc_ace10_cents', 'INTEGER');
+  add('pc_cgc_pristine_10_cents', 'INTEGER');
   add('pc_updated_at', 'INTEGER');
   add('required_keywords', 'TEXT'); // JSON array of strings
   add('forbidden_keywords', 'TEXT'); // JSON array of strings
@@ -283,6 +285,8 @@ export function updateSearchPrices(id, info) {
        pc_grade9_cents = ?,
        pc_grade9_5_cents = ?,
        pc_psa10_cents = ?,
+       pc_ace10_cents = ?,
+       pc_cgc_pristine_10_cents = ?,
        pc_updated_at = strftime('%s','now')
      WHERE id = ?`
   ).run(
@@ -295,6 +299,8 @@ export function updateSearchPrices(id, info) {
     info.prices?.grade9 ?? null,
     info.prices?.grade9_5 ?? null,
     info.prices?.psa10 ?? null,
+    info.prices?.ace10 ?? null,
+    info.prices?.cgc_pristine_10 ?? null,
     id
   );
 }
@@ -363,13 +369,19 @@ export function upsertListing(row) {
   return { isNew: !existed };
 }
 
+const LISTING_SELECT_COLS = `
+  l.*, s.name AS search_name, s.url AS search_url,
+  s.required_keywords AS search_required_keywords,
+  s.forbidden_keywords AS search_forbidden_keywords,
+  s.pc_psa10_cents AS search_pc_psa10_cents,
+  s.pc_ace10_cents AS search_pc_ace10_cents,
+  s.pc_cgc_pristine_10_cents AS search_pc_cgc_pristine_10_cents
+`;
+
 export function listListings({ activeOnly = true } = {}) {
   const nowSec = Math.floor(Date.now() / 1000);
   const sql = `
-    SELECT l.*, s.name AS search_name, s.url AS search_url,
-           s.required_keywords AS search_required_keywords,
-           s.forbidden_keywords AS search_forbidden_keywords,
-           s.pc_psa10_cents AS search_pc_psa10_cents
+    SELECT ${LISTING_SELECT_COLS}
     FROM listings l
     JOIN searches s ON s.id = l.search_id
     ${activeOnly ? 'WHERE l.ends_at IS NULL OR l.ends_at > ?' : ''}
@@ -383,9 +395,7 @@ export function listListingsForSearch(searchId) {
   const nowSec = Math.floor(Date.now() / 1000);
   return db
     .prepare(
-      `SELECT l.*, s.required_keywords AS search_required_keywords,
-              s.forbidden_keywords AS search_forbidden_keywords,
-              s.pc_psa10_cents AS search_pc_psa10_cents
+      `SELECT ${LISTING_SELECT_COLS}
        FROM listings l
        JOIN searches s ON s.id = l.search_id
        WHERE l.search_id = ? AND (l.ends_at IS NULL OR l.ends_at > ?)

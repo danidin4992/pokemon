@@ -15,6 +15,17 @@ const PRICE_FIELDS = {
   manual_only_price: 'psa10', // PSA 10
 };
 
+// Additional tiers only present in the "More Prices" expandable section as
+// <tr><td>Label</td><td class="price js-price">$X.XX</td></tr>. We match by
+// exact label text, so the mapping is: label → semantic key.
+const EXTRA_TIER_LABELS = {
+  'ACE 10': 'ace10',
+  'CGC 10 Pristine': 'cgc_pristine_10',
+  'CGC 10': 'cgc10',
+  'BGS 10': 'bgs10',
+  'BGS 10 Black': 'bgs10_black',
+};
+
 function parsePriceCents(text) {
   if (!text) return null;
   const cleaned = text.trim();
@@ -102,6 +113,16 @@ export function parseProductPage(html) {
     const priceText = $(`#${cellId} .price.js-price`).first().text().trim();
     prices[key] = parsePriceCents(priceText);
   }
+
+  // Scan the "More Prices" expandable table for tiers not exposed as cell IDs.
+  // Structure: <tr><td>Label</td><td class="price js-price">$X.XX</td></tr>
+  $('tr').each((_, el) => {
+    const label = $(el).find('td').first().text().trim();
+    const key = EXTRA_TIER_LABELS[label];
+    if (!key || prices[key] != null) return;
+    const priceText = $(el).find('td.price.js-price').first().text().trim();
+    prices[key] = parsePriceCents(priceText);
+  });
 
   const psa10History = extractPsa10History(html);
   const image_url = extractProductImage($);
