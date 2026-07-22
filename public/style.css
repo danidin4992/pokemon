@@ -374,6 +374,8 @@ h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; 
   top: auto;
   width: 500px;
   max-width: calc(100vw - 320px);
+  max-height: calc(100vh - 60px);
+  overflow-y: auto;
   background: white;
   border: 1px solid #e3e5e8;
   border-radius: 10px;
@@ -385,6 +387,8 @@ h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; 
   transition: opacity 0.15s ease, transform 0.15s ease;
   z-index: 100;
 }
+.card-popover::-webkit-scrollbar { width: 8px; }
+.card-popover::-webkit-scrollbar-thumb { background: #d0d3d7; border-radius: 4px; }
 .card-tile:hover .card-popover {
   opacity: 1;
   transform: translateY(0);
@@ -512,20 +516,30 @@ h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; 
 
 /* Tier preferences panel */
 .tier-prefs {
-  margin-top: 10px;
-  border: 1px solid #e3e5e8;
+  margin: 0 0 12px;
+  border: 1px solid #0053a0;
   border-radius: 6px;
   font-size: 12px;
+  background: white;
 }
 .tier-prefs summary {
   cursor: pointer;
   padding: 8px 10px;
-  color: #555;
-  font-weight: 600;
-  background: #fafbfc;
-  border-radius: 6px;
+  color: white;
+  font-weight: 700;
+  background: #0053a0;
+  border-radius: 5px 5px 0 0;
   user-select: none;
+  list-style: none;
 }
+.tier-prefs summary::-webkit-details-marker { display: none; }
+.tier-prefs summary::before {
+  content: '▸ ';
+  display: inline-block;
+  transition: transform 0.15s;
+}
+.tier-prefs[open] summary::before { transform: rotate(90deg); }
+.tier-prefs:not([open]) summary { border-radius: 5px; }
 .tier-prefs[open] summary { border-bottom: 1px solid #e3e5e8; border-radius: 6px 6px 0 0; }
 .tier-prefs-body {
   padding: 6px 10px 10px;

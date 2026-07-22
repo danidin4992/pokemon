@@ -558,9 +558,9 @@ function renderCardPopover(s) {
       </div>
       <a class="pop-open" href="${escapeHtml(s.pricecharting_url || '')}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open ↗</a>
     </div>
+    ${prefs}
     ${table}
     <div class="pop-chart">${spark}</div>
-    ${prefs}
     <div class="pop-updated">Updated ${updated} · click card to filter auctions</div>
   </div>`;
 }
