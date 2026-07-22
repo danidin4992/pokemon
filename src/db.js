@@ -142,6 +142,12 @@ function migrate() {
   add('pc_psa10_cents', 'INTEGER');
   add('pc_ace10_cents', 'INTEGER');
   add('pc_cgc_pristine_10_cents', 'INTEGER');
+  add('pc_cgc10_cents', 'INTEGER');
+  add('pc_bgs10_cents', 'INTEGER');
+  add('pc_bgs10_black_cents', 'INTEGER');
+  add('pc_tag10_cents', 'INTEGER');
+  add('pc_tag10_pristine_cents', 'INTEGER');
+  add('pc_sgc10_cents', 'INTEGER');
   add('pc_updated_at', 'INTEGER');
 
   // Add tier column to pc_price_history if absent, backfill existing rows as psa10
@@ -314,6 +320,12 @@ export function updateSearchPrices(id, info) {
        pc_psa10_cents = ?,
        pc_ace10_cents = ?,
        pc_cgc_pristine_10_cents = ?,
+       pc_cgc10_cents = ?,
+       pc_bgs10_cents = ?,
+       pc_bgs10_black_cents = ?,
+       pc_tag10_cents = ?,
+       pc_tag10_pristine_cents = ?,
+       pc_sgc10_cents = ?,
        pc_updated_at = strftime('%s','now')
      WHERE id = ?`
   ).run(
@@ -328,6 +340,12 @@ export function updateSearchPrices(id, info) {
     info.prices?.psa10 ?? null,
     info.prices?.ace10 ?? null,
     info.prices?.cgc_pristine_10 ?? null,
+    info.prices?.cgc10 ?? null,
+    info.prices?.bgs10 ?? null,
+    info.prices?.bgs10_black ?? null,
+    info.prices?.tag10 ?? null,
+    info.prices?.tag10_pristine ?? null,
+    info.prices?.sgc10 ?? null,
     id
   );
 }

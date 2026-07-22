@@ -62,6 +62,12 @@ export async function runAllSearches({ onProgress, filterSearch } = {}) {
           snapshotTierPrice(search.id, 'psa10', info.prices?.psa10);
           snapshotTierPrice(search.id, 'ace10', info.prices?.ace10);
           snapshotTierPrice(search.id, 'cgc_pristine_10', info.prices?.cgc_pristine_10);
+          snapshotTierPrice(search.id, 'cgc10', info.prices?.cgc10);
+          snapshotTierPrice(search.id, 'bgs10', info.prices?.bgs10);
+          snapshotTierPrice(search.id, 'bgs10_black', info.prices?.bgs10_black);
+          snapshotTierPrice(search.id, 'tag10', info.prices?.tag10);
+          snapshotTierPrice(search.id, 'tag10_pristine', info.prices?.tag10_pristine);
+          snapshotTierPrice(search.id, 'sgc10', info.prices?.sgc10);
           onProgress?.({ stage: 'pc-fetched', search, info });
         } catch (e) {
           onProgress?.({ stage: 'pc-error', search, error: e.message });

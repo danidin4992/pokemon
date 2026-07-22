@@ -463,6 +463,114 @@ h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; 
 .card-popover .tier-row.ace10 { background: #f2f9f3; }
 .card-popover .tier-row.ace10 .tier-label,
 .card-popover .tier-row.ace10 .tier-price { color: #1b7a3d; }
+.card-popover .tier-row.bgs10-black { background: #ede5f2; }
+.card-popover .tier-row.bgs10-black .tier-label,
+.card-popover .tier-row.bgs10-black .tier-price { color: #4a2a5c; }
+.card-popover .tier-row.bgs10 { background: #ebe7f3; }
+.card-popover .tier-row.bgs10 .tier-label,
+.card-popover .tier-row.bgs10 .tier-price { color: #5b4c99; }
+.card-popover .tier-row.tag10 { background: #e6f5f7; }
+.card-popover .tier-row.tag10 .tier-label,
+.card-popover .tier-row.tag10 .tier-price { color: #0891b2; }
+.card-popover .tier-row.tag10-pristine { background: #fbe6ee; }
+.card-popover .tier-row.tag10-pristine .tier-label,
+.card-popover .tier-row.tag10-pristine .tier-price { color: #c92a75; }
+.card-popover .tier-row.cgc10 { background: #e9f3f3; }
+.card-popover .tier-row.cgc10 .tier-label,
+.card-popover .tier-row.cgc10 .tier-price { color: #2e8b8b; }
+.card-popover .tier-row.sgc10 { background: #f5ecdc; }
+.card-popover .tier-row.sgc10 .tier-label,
+.card-popover .tier-row.sgc10 .tier-price { color: #8b4513; }
+
+/* Tier preferences panel */
+.tier-prefs {
+  margin-top: 10px;
+  border: 1px solid #e3e5e8;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.tier-prefs summary {
+  cursor: pointer;
+  padding: 8px 10px;
+  color: #555;
+  font-weight: 600;
+  background: #fafbfc;
+  border-radius: 6px;
+  user-select: none;
+}
+.tier-prefs[open] summary { border-bottom: 1px solid #e3e5e8; border-radius: 6px 6px 0 0; }
+.tier-prefs-body {
+  padding: 6px 10px 10px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.tier-pref-row {
+  display: grid;
+  grid-template-columns: 16px 10px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 0;
+  cursor: pointer;
+  font-size: 12px;
+}
+.tier-pref-row input { margin: 0; cursor: pointer; }
+.tier-pref-swatch {
+  width: 10px;
+  height: 3px;
+  border-radius: 2px;
+}
+.tier-pref-name { font-weight: 500; }
+.tier-pref-value {
+  font-weight: 700;
+  color: #666;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+}
+
+/* Help modal */
+.modal[hidden] { display: none; }
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 250;
+}
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 25, 35, 0.55);
+  animation: drawer-fade 0.15s ease;
+}
+.modal-panel {
+  position: absolute;
+  top: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(1120px, 96vw);
+  height: calc(100vh - 80px);
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: drawer-fade 0.2s ease;
+}
+.modal-panel iframe {
+  flex: 1;
+  border: 0;
+  width: 100%;
+  height: 100%;
+  background: #0f1420;
+}
+.modal-foot {
+  display: flex;
+  justify-content: center;
+  padding: 12px 16px;
+  border-top: 1px solid #e3e5e8;
+  background: #fafbfc;
+  flex-shrink: 0;
+}
+.modal-foot button { min-width: 160px; }
 .card-popover .pop-chart {
   border-top: 1px dashed #f0dcc4;
   padding-top: 10px;

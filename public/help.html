@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>טבלת דרגות ה-10 — שלמות, עומק בדיקה וערך שוק</title>
+<style>
+  :root{
+    --bg:#0f1420;
+    --surface:#171e2e;
+    --surface2:#1e2739;
+    --ink:#f2f5fa;
+    --muted:#9aa7bd;
+    --line:#2b3550;
+    --eye:#3b82f6;      /* naked eye - blue */
+    --mag:#e8b923;      /* magnification - gold */
+    --depth:#4cc3c9;    /* depth meter accent */
+    --vhigh:#30a46c;    /* very high */
+    --high:#4cc3c9;     /* high */
+    --med:#e8b923;      /* medium */
+    --low:#e5734d;      /* small */
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,"Segoe UI","Rubik","Assistant",Arial,sans-serif;
+    line-height:1.6;padding:30px 16px 60px;
+  }
+  .wrap{max-width:1060px;margin:0 auto}
+  h1{font-size:25px;margin:0 0 6px;letter-spacing:-.3px}
+  .sub{color:var(--muted);margin:0 0 22px;font-size:14.5px}
+
+  /* two-axes explainer */
+  .axes{display:grid;grid-template-columns:1fr 1fr auto;gap:12px;margin-bottom:22px;align-items:stretch}
+  @media(max-width:720px){.axes{grid-template-columns:1fr}}
+  .axis{background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:14px 16px}
+  .axis b{display:block;font-size:13.5px;margin-bottom:3px}
+  .axis span{color:var(--muted);font-size:12.3px}
+  .axis .tag{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.05em;
+    padding:2px 8px;border-radius:20px;margin-bottom:7px}
+  .axis.a1 .tag{background:rgba(76,195,201,.16);color:#7fd7db}
+  .axis.a2 .tag{background:rgba(232,185,35,.16);color:#f2ce55}
+  .axis.eq{display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:transparent;border:none;padding:0 4px;min-width:96px}
+  .axis.eq .plus{font-size:22px;color:var(--muted)}
+  .axis.eq .res{font-size:12px;font-weight:700;color:#5fd39b;text-align:center;margin-top:6px}
+  @media(max-width:720px){.axis.eq{flex-direction:row;gap:10px;padding:6px}}
+
+  /* legend */
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;
+    padding:4px 11px;border-radius:20px;border:1px solid var(--line);background:var(--surface)}
+  .dot{width:9px;height:9px;border-radius:50%}
+
+  .section-t{font-size:12.5px;color:var(--muted);letter-spacing:.06em;
+    text-transform:uppercase;margin:26px 0 12px;font-weight:700}
+
+  /* table */
+  .tblwrap{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  thead th{background:var(--surface2);color:var(--muted);font-size:11.5px;letter-spacing:.04em;
+    text-transform:uppercase;font-weight:700;padding:12px 14px;text-align:right;white-space:nowrap}
+  tbody td{padding:14px;border-top:1px solid var(--line);vertical-align:middle}
+  tbody tr:hover{background:rgba(255,255,255,.02)}
+
+  .rank{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:8px;
+    font-weight:800;font-size:13px;color:#0f1420}
+  .grade{font-weight:700;font-size:14.5px;display:block}
+  .gsub{color:var(--muted);font-size:11.5px;display:block;margin-top:2px}
+
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;
+    padding:4px 10px;border-radius:20px;white-space:nowrap}
+  .pill.eye{background:rgba(59,130,246,.15);color:#8fb8ff}
+  .pill.mag{background:rgba(232,185,35,.16);color:#f2ce55}
+  .method-note{color:var(--muted);font-size:11.5px;display:block;margin-top:4px}
+
+  /* depth meter */
+  .depth{display:flex;align-items:center;gap:7px;margin-top:8px}
+  .meter{display:flex;gap:3px}
+  .meter i{width:14px;height:6px;border-radius:2px;background:var(--line);display:block}
+  .meter i.on{background:var(--depth)}
+  .depth .dl{font-size:11px;color:var(--muted);font-weight:600}
+
+  .center{font-weight:600;font-size:13px}
+  .center small{display:block;color:var(--muted);font-weight:400;font-size:11px;margin-top:2px}
+
+  .mkt{display:inline-block;font-size:12px;font-weight:700;padding:4px 11px;border-radius:8px}
+  .mkt.vhigh{background:rgba(48,164,108,.16);color:#5fd39b;border:1px solid rgba(48,164,108,.35)}
+  .mkt.high{background:rgba(76,195,201,.14);color:#7fd7db;border:1px solid rgba(76,195,201,.32)}
+  .mkt.med{background:rgba(232,185,35,.14);color:#f2ce55;border:1px solid rgba(232,185,35,.32)}
+  .mkt.low{background:rgba(229,115,77,.14);color:#f0956f;border:1px solid rgba(229,115,77,.32)}
+  .mkt small{display:block;font-weight:400;font-size:10.5px;opacity:.85;margin-top:1px}
+
+  .divider td{background:var(--surface2);padding:7px 14px;color:var(--muted);
+    font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+
+  /* perfection ladder */
+  .perf{margin-top:24px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px}
+  .perf h3{margin:0 0 3px;font-size:16px}
+  .perf .pnote{margin:0 0 16px;color:var(--muted);font-size:12.8px}
+  .prow{display:flex;align-items:center;gap:12px;padding:9px 0;border-top:1px solid var(--line)}
+  .prow:first-of-type{border-top:none}
+  .pnum{flex:0 0 24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+    font-weight:800;font-size:12px;color:#0f1420}
+  .pname{font-weight:700;font-size:14px}
+  .pwhy{color:var(--muted);font-size:12px;margin-right:auto;text-align:left}
+  @media(max-width:600px){.pwhy{display:none}}
+
+  /* takeaways */
+  .notes{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:22px}
+  @media(max-width:720px){.notes{grid-template-columns:1fr}}
+  .note{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+  .note b{display:block;font-size:14px;margin-bottom:5px}
+  .note.star{border-color:rgba(48,164,108,.4);background:linear-gradient(180deg,rgba(48,164,108,.07),transparent)}
+  .note p{margin:0;color:var(--muted);font-size:12.8px}
+  .foot{color:var(--muted);font-size:11.5px;margin-top:24px;text-align:center}
+
+  @media(max-width:640px){
+    thead th:nth-child(4),tbody td:nth-child(4){display:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>דרגות ה-"10" — שלמות, עומק בדיקה וערך שוק</h1>
+  <p class="sub">כל הדרגות הן "10", אבל לא נבדקות באותו עומק, לא דורשות אותו רף, ולא שוות אותו דבר.</p>
+
+  <!-- two axes -->
+  <div class="axes">
+    <div class="axis a1">
+      <span class="tag">ציר 1</span>
+      <b>עומק בדיקה</b>
+      <span>כמה קטן צריך להיות פגם כדי שבכלל יתפסו אותו — עין ← הגדלה ← מכונה.</span>
+    </div>
+    <div class="axis eq">
+      <span class="plus">+</span>
+      <span class="res">= שלמות אמיתית</span>
+    </div>
+    <div class="axis a2">
+      <span class="tag">ציר 2</span>
+      <b>גובה הרף</b>
+      <span>כמה קרוב למושלם הקלף חייב להיות כדי לקבל את הציון.</span>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="chip"><span class="pill eye" style="padding:2px 8px">👁 בעין בלבד</span></span>
+    <span class="chip"><span class="pill mag" style="padding:2px 8px">🔍 מעבר לעין</span></span>
+    <span class="chip"><span class="meter"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></span> עומק בדיקה (1–4)</span>
+    <span class="chip"><span class="dot" style="background:var(--vhigh)"></span> שוק גבוה מאוד</span>
+    <span class="chip"><span class="dot" style="background:var(--high)"></span> גבוה</span>
+    <span class="chip"><span class="dot" style="background:var(--med)"></span> בינוני</span>
+    <span class="chip"><span class="dot" style="background:var(--low)"></span> קטן</span>
+  </div>
+
+  <p class="section-t">מסודר לפי הרף — מהכי קשה לעבור לפחות מחמיר</p>
+  <div class="tblwrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:38px">#</th>
+          <th>דרגה</th>
+          <th>שיטת בדיקה + עומק</th>
+          <th>מרכוז נדרש (חזית)</th>
+          <th>ערך שוק נתפס</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="rank" style="background:#e5484d">1</span></td>
+          <td><span class="grade">BGS Black Label 10</span><span class="gsub">Beckett · אנושי + 4 תת-ציונים</span></td>
+          <td>
+            <span class="pill mag">🔍 מעבר לעין</span>
+            <span class="method-note">הגדלה אנושית + תת-ציונים גלויים</span>
+            <span class="depth"><span class="meter"><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span><span class="dl">עומק 3 · הגדלה אנושית</span></span>
+          </td>
+          <td><span class="center">50/50<small>כל 4 התת-ציונים 10 מדויק</small></span></td>
+          <td><span class="mkt vhigh">גבוה מאוד<small>הפרמיה הגבוהה ביותר</small></span></td>
+        </tr>
+        <tr>
+          <td><span class="rank" style="background:#f0743f">2</span></td>
+          <td><span class="grade">TAG 10 Pristine (10P)</span><span class="gsub">מכונה · ראייה ממוחשבת</span></td>
+          <td>
+            <span class="pill mag">🔍 מעבר לעין</span>
+            <span class="method-note">סריקה מיקרוסקופית (AI), מרכוז לעשירית האחוז</span>
+            <span class="depth"><span class="meter"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></span><span class="dl">עומק 4 · מכונה</span></span>
+          </td>
+          <td><span class="center">~51/49<small>סטייה ±1% בלבד</small></span></td>
+          <td><span class="mkt med">בינוני<small>~10–25% מתחת ל-PSA</small></span></td>
+        </tr>
+        <tr>
+          <td><span class="rank" style="background:#e8b923">3</span></td>
+          <td><span class="grade">ACE 10</span><span class="gsub">בריטי · Pristine</span></td>
+          <td>
+            <span class="pill mag">🔍 מעבר לעין</span>
+            <span class="method-note">תחת הגדלה — רמת ההגדלה לא מפורסמת</span>
+            <span class="depth"><span class="meter"><i class="on"></i><i class="on"></i><i></i><i></i></span><span class="dl">עומק 2 · הגדלה (לא מפורסם)</span></span>
+          </td>
+          <td><span class="center">50/50 ±2%<small>48/52 – 52/48</small></span></td>
+          <td><span class="mkt med">בינוני<small>חזק בבריטניה, דיסקאונט גלובלי</small></span></td>
+        </tr>
+        <tr>
+          <td><span class="rank" style="background:#c9c14a">4</span></td>
+          <td><span class="grade">BGS 10 Pristine (10P זהב)</span><span class="gsub">Beckett · תווית זהב</span></td>
+          <td>
+            <span class="pill mag">🔍 מעבר לעין</span>
+            <span class="method-note">הגדלה אנושית</span>
+            <span class="depth"><span class="meter"><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span><span class="dl">עומק 3 · הגדלה אנושית</span></span>
+          </td>
+          <td><span class="center">50/50<small>תת-ציונים גבוהים מאוד</small></span></td>
+          <td><span class="mkt high">גבוה</span></td>
+        </tr>
+        <tr>
+          <td><span class="rank" style="background:#a7b356">5</span></td>
+          <td><span class="grade">CGC Pristine 10</span><span class="gsub">תווית זהב · נדיר</span></td>
+          <td>
+            <span class="pill mag">🔍 מעבר לעין</span>
+            <span class="method-note">זכוכית מגדלת ×10 — מוצהר</span>
+            <span class="depth"><span class="meter"><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span><span class="dl">עומק 3 · ×10 מוצהר</span></span>
+          </td>
+          <td><span class="center">~50/50<small>חף מפגם בכל הפרמטרים</small></span></td>
+          <td><span class="mkt high">גבוה<small>עוקף PSA בחלק מהמודרניים</small></span></td>
+        </tr>
+        <tr>
+          <td><span class="rank" style="background:#84a86a">6</span></td>
+          <td><span class="grade">TAG 10 (Gem Mint)</span><span class="gsub">מכונה · ראייה ממוחשבת</span></td>
+          <td>
+            <span class="pill mag">🔍 מעבר לעין</span>
+            <span class="method-note">מכונה אכזרית על פגמים — אבל רף מרכוז רופף</span>
+            <span class="depth"><span class="meter"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></span><span class="dl">עומק 4 · מכונה</span></span>
+          </td>
+          <td><span class="center">עד ~65/35<small>מרכוז רופף יחסית</small></span></td>
+          <td><span class="mkt low">בינוני-קטן</span></td>
+        </tr>
+
+        <tr class="divider"><td colspan="5">⬇ מכאן — בדיקה בעין בלבד · הרף הנפוץ · הכי קל לעבור</td></tr>
+
+        <tr>
+          <td><span class="rank" style="background:#4d90cf">7</span></td>
+          <td><span class="grade">CGC 10 Gem Mint</span><span class="gsub">Gem Mint · ציון כולל</span></td>
+          <td>
+            <span class="pill eye">👁 בעין בלבד</span>
+            <span class="method-note">מותר פגם קל אחד תחת הגדלה</span>
+            <span class="depth"><span class="meter"><i class="on"></i><i></i><i></i><i></i></span><span class="dl">עומק 1 · עין בלבד</span></span>
+          </td>
+          <td><span class="center">עד 55/45</span></td>
+          <td><span class="mkt high">גבוה<small>5–10% מתחת ל-PSA</small></span></td>
+        </tr>
+        <tr>
+          <td><span class="rank" style="background:#3b82f6">8</span></td>
+          <td><span class="grade">PSA 10</span><span class="gsub">Gem Mint · תקן הזהב</span></td>
+          <td>
+            <span class="pill eye">👁 בעין בלבד</span>
+            <span class="method-note">בעין בלתי מזוינת</span>
+            <span class="depth"><span class="meter"><i class="on"></i><i></i><i></i><i></i></span><span class="dl">עומק 1 · עין בלבד</span></span>
+          </td>
+          <td><span class="center">עד 55/45</span></td>
+          <td><span class="mkt vhigh">גבוה מאוד<small>הכי נזיל, הביקוש הרחב ביותר</small></span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- perfection ladder -->
+  <div class="perf">
+    <h3>סידור לפי שלמות הקלף המאומתת 🔬</h3>
+    <p class="pnote">כאן משלבים את שני הצירים: עומק הבדיקה × גובה הרף. זה עונה על "איזה קלף באמת הכי קרוב למושלם" — לא רק "הכי קשה לעבור". סינתזה מנומקת מהמידע הזמין, לא דירוג רשמי.</p>
+
+    <div class="prow"><span class="pnum" style="background:#e5484d">1</span><span class="pname">TAG 10 Pristine</span><span class="pwhy">גלאי מכונה הכי חד + מרכוז ±1% — האמירה הכי חזקה ש"אין פגם"</span></div>
+    <div class="prow"><span class="pnum" style="background:#f0743f">2</span><span class="pname">BGS Black Label 10</span><span class="pwhy">הרף האנושי הכי גבוה — 4 תת-ציונים 10 מושלמים</span></div>
+    <div class="prow"><span class="pnum" style="background:#e8b923">3</span><span class="pname">CGC Pristine 10 ≈ BGS 10 Pristine</span><span class="pwhy">חף מפגם תחת ×10 / הגדלה אנושית, מרכוז ~50/50</span></div>
+    <div class="prow"><span class="pnum" style="background:#b0a95a">4</span><span class="pname">ACE 10</span><span class="pwhy">מרכוז צר מאוד, אבל עומק הבדיקה על משטח/פינות לא שקוף</span></div>
+    <div class="prow"><span class="pnum" style="background:#84a86a">5</span><span class="pname">TAG 10 (Gem Mint)</span><span class="pwhy">משטח/פינות נקיים לפי מכונה — אבל לא בהכרח ממורכז מושלם</span></div>
+    <div class="prow"><span class="pnum" style="background:#4d90cf">6</span><span class="pname">CGC 10 Gem Mint ≈ PSA 10</span><span class="pwhy">"מושלם לעין" בלבד — יכול להסתיר פגמים תת-נראים</span></div>
+  </div>
+
+  <div class="notes">
+    <div class="note">
+      <b>PSA 10 = "מושלם לעין", לא מושלם באמת</b>
+      <p>בעין אנושית אי אפשר לראות פגם ברמת המיקרון, אז PSA 10 אומר "לא נראה פגם" — לא "אין פגם". כל דרגה "מעבר לעין" מאמתת שלמות ברמה עמוקה יותר.</p>
+    </div>
+    <div class="note">
+      <b>עומק בדיקה ≠ גובה רף</b>
+      <p>ל-TAG 10 Gem יש את הגלאי הכי חד (עומק 4), אבל רף מרכוז רופף — אז הוא נקי מפגמים אך לא בהכרח מושלם. מכונה חדה לא מחליפה רף תובעני.</p>
+    </div>
+    <div class="note star">
+      <b>היוצא-דופן: BGS Black Label ⭐</b>
+      <p>מהמעטים שבהם "הכי קשה להשיג" נפגש עם "הכי שווה" — הנדירות של 4 תת-ציונים מושלמים מתורגמת ישירות לפרמיה הגבוהה ביותר.</p>
+    </div>
+    <div class="note">
+      <b>שלמות ≠ ערך שוק</b>
+      <p>הקלף ה"הכי מושלם מאומת" (TAG 10P) שווה פחות מ-PSA 10 שהוא "רק מושלם לעין" — כי השוק משלם על מותג, נזילות והכרה, לא על מיקרונים.</p>
+    </div>
+  </div>
+
+  <p class="foot">מקורות: CGC / ACE / TAG / Beckett grading scales · Card Chill · Summoners Vault · GradingMetric · CenterGrade · GRADEx 2026. הנתונים הם רף הדרגה; ההערכה בפועל לכל קלף לגופה. חברות מסוימות (ACE, TAG) לא מפרסמות מספרי הגדלה/רזולוציה מדויקים — עומק הבדיקה שם הוא הערכה.</p>
+</div>
+</body>
+</html>

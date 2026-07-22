@@ -24,6 +24,9 @@ const EXTRA_TIER_LABELS = {
   'CGC 10': 'cgc10',
   'BGS 10': 'bgs10',
   'BGS 10 Black': 'bgs10_black',
+  'TAG 10': 'tag10',
+  'TAG 10 Pristine': 'tag10_pristine',
+  'SGC 10': 'sgc10',
 };
 
 function parsePriceCents(text) {

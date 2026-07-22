@@ -14,6 +14,7 @@
         <span id="last-run" class="muted">—</span>
         <span id="ebay-usage" class="ebay-usage" title="eBay Browse API calls today"></span>
         <div id="recipient-picker" class="recipient-picker"></div>
+        <button id="toggle-help" class="secondary" title="Grading grades reference">📖 עזר</button>
         <button id="toggle-settings" class="secondary" title="Global keyword filters">⚙ Filters</button>
         <button id="run-now" class="primary">Run now</button>
         <button id="send-email" class="secondary">Email digest</button>
@@ -67,6 +68,16 @@
 
     </div>
   </main>
+
+  <div id="help-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-panel">
+      <iframe id="help-iframe" src="/help.html" title="Grading reference"></iframe>
+      <div class="modal-foot">
+        <button type="button" class="primary" data-modal-close>סגור</button>
+      </div>
+    </div>
+  </div>
 
   <div id="edit-drawer" class="drawer" hidden>
     <div class="drawer-backdrop" data-drawer-close></div>

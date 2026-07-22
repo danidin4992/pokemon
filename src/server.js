@@ -85,6 +85,12 @@ app.get('/api/searches', (req, res) => {
       psa10_history: all.psa10 || [],
       ace10_history: all.ace10 || [],
       cgc_pristine_10_history: all.cgc_pristine_10 || [],
+      cgc10_history: all.cgc10 || [],
+      bgs10_history: all.bgs10 || [],
+      bgs10_black_history: all.bgs10_black || [],
+      tag10_history: all.tag10 || [],
+      tag10_pristine_history: all.tag10_pristine || [],
+      sgc10_history: all.sgc10 || [],
     };
   });
   res.json(enriched);
@@ -139,6 +145,12 @@ app.post('/api/searches/:id/refresh-prices', async (req, res) => {
     snapshotTierPrice(id, 'psa10', info.prices?.psa10);
     snapshotTierPrice(id, 'ace10', info.prices?.ace10);
     snapshotTierPrice(id, 'cgc_pristine_10', info.prices?.cgc_pristine_10);
+    snapshotTierPrice(id, 'cgc10', info.prices?.cgc10);
+    snapshotTierPrice(id, 'bgs10', info.prices?.bgs10);
+    snapshotTierPrice(id, 'bgs10_black', info.prices?.bgs10_black);
+    snapshotTierPrice(id, 'tag10', info.prices?.tag10);
+    snapshotTierPrice(id, 'tag10_pristine', info.prices?.tag10_pristine);
+    snapshotTierPrice(id, 'sgc10', info.prices?.sgc10);
     res.json({ ok: true, info });
   } catch (e) {
     res.status(500).json({ error: e.message });

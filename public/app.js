@@ -175,10 +175,37 @@ function fmtUsdCompact(cents) {
 }
 
 const TIER_COLORS = {
-  psa10: { line: '#e05a1c', fill: '#fce9dc', name: 'PSA 10' },
-  ace10: { line: '#1b7a3d', fill: '#daf1e0', name: 'ACE 10' },
+  bgs10_black: { line: '#4a2a5c', fill: '#e5dbeb', name: 'BGS Black Label 10' },
+  tag10_pristine: { line: '#c92a75', fill: '#f6d9e6', name: 'TAG 10 Pristine' },
+  bgs10: { line: '#5b4c99', fill: '#e2ddf0', name: 'BGS 10' },
   cgc_pristine_10: { line: '#0053a0', fill: '#dbe7f4', name: 'CGC Pristine 10' },
+  psa10: { line: '#e05a1c', fill: '#fce9dc', name: 'PSA 10' },
+  tag10: { line: '#0891b2', fill: '#cfefef', name: 'TAG 10 Gem Mint' },
+  cgc10: { line: '#2e8b8b', fill: '#d4ecec', name: 'CGC 10 Gem Mint' },
+  ace10: { line: '#1b7a3d', fill: '#daf1e0', name: 'ACE 10' },
+  sgc10: { line: '#8b4513', fill: '#eddec8', name: 'SGC 10' },
 };
+
+// Persistent filter — which tiers to show. Default: all on.
+const TIER_PREFS_KEY = 'pokemon-tier-prefs';
+const ALL_TIER_KEYS = Object.keys(TIER_COLORS);
+let tierPrefs = null;
+function getTierPrefs() {
+  if (tierPrefs) return tierPrefs;
+  try {
+    const raw = localStorage.getItem(TIER_PREFS_KEY);
+    tierPrefs = raw ? JSON.parse(raw) : {};
+  } catch { tierPrefs = {}; }
+  // Backfill any missing keys as true
+  for (const k of ALL_TIER_KEYS) if (tierPrefs[k] === undefined) tierPrefs[k] = true;
+  return tierPrefs;
+}
+function setTierPref(key, on) {
+  const p = getTierPrefs();
+  p[key] = !!on;
+  localStorage.setItem(TIER_PREFS_KEY, JSON.stringify(p));
+}
+function isTierOn(key) { return getTierPrefs()[key] !== false; }
 
 function renderMultiSparkline(seriesByTier, opts = {}) {
   const W = opts.W || 460;
@@ -246,6 +273,17 @@ function renderMultiSparkline(seriesByTier, opts = {}) {
     legendItems.push(
       `<span class="legend-item"><span class="legend-swatch" style="background:${s.color.line}"></span>${s.color.name} <strong>${fmtUsd(s.points[s.points.length - 1].price_cents)}</strong></span>`
     );
+    // Label the last data point of each series with its current price (helps
+    // read the chart without hunting through the legend). Special emphasis
+    // for PSA 10 since that's the reference tier.
+    if (pts.length >= 1) {
+      const last = pts[pts.length - 1];
+      const currentPrice = fmtUsdCompact(s.points[s.points.length - 1].price_cents);
+      const isPSA = s.tier === 'psa10';
+      const fontSize = isPSA ? 11 : 9.5;
+      const fontWeight = isPSA ? 800 : 600;
+      seriesSvg += `<text x="${(last.x + 6).toFixed(1)}" y="${(last.y + 3).toFixed(1)}" font-size="${fontSize}" font-weight="${fontWeight}" fill="${s.color.line}" font-family="system-ui">${currentPrice}</text>`;
+    }
   }
 
   const firstDate = new Date(tMin).toISOString().slice(0, 7);
@@ -374,11 +412,17 @@ function renderMiniSparkline(history) {
   </svg>`;
 }
 
-// Fixed display order: PSA 10 → CGC Pristine 10 → ACE 10
+// All tiers we display, mapped from field name → tier key + label + class
 const TIER_ORDER = [
-  { key: 'pc_psa10_cents',           label: 'PSA 10',          cls: 'psa10' },
-  { key: 'pc_cgc_pristine_10_cents', label: 'CGC Pristine 10', cls: 'cgc-pristine' },
-  { key: 'pc_ace10_cents',           label: 'ACE 10',          cls: 'ace10' },
+  { key: 'pc_bgs10_black_cents',     tier: 'bgs10_black',     label: 'BGS Black Label 10', cls: 'bgs10-black' },
+  { key: 'pc_tag10_pristine_cents',  tier: 'tag10_pristine',  label: 'TAG 10 Pristine',    cls: 'tag10-pristine' },
+  { key: 'pc_bgs10_cents',           tier: 'bgs10',           label: 'BGS 10',             cls: 'bgs10' },
+  { key: 'pc_cgc_pristine_10_cents', tier: 'cgc_pristine_10', label: 'CGC Pristine 10',    cls: 'cgc-pristine' },
+  { key: 'pc_psa10_cents',           tier: 'psa10',           label: 'PSA 10',             cls: 'psa10' },
+  { key: 'pc_tag10_cents',           tier: 'tag10',           label: 'TAG 10 Gem Mint',    cls: 'tag10' },
+  { key: 'pc_cgc10_cents',           tier: 'cgc10',           label: 'CGC 10 Gem Mint',    cls: 'cgc10' },
+  { key: 'pc_ace10_cents',           tier: 'ace10',           label: 'ACE 10',             cls: 'ace10' },
+  { key: 'pc_sgc10_cents',           tier: 'sgc10',           label: 'SGC 10',             cls: 'sgc10' },
 ];
 
 // Order tiers by current price, highest first.
@@ -399,14 +443,36 @@ function renderCardTierChips(s, opts = {}) {
 }
 
 // Vertical table-like tier list — one tier per row, label left, price right.
+// Filter tiers by preferences (checkboxes) — if none selected shows a hint.
 function renderCardTierTable(s) {
+  const tiers = orderedTiers(s).filter((t) => isTierOn(t.tier));
+  if (tiers.length === 0) {
+    return `<div class="pop-tier-table"><div class="tier-row" style="color:#888;font-style:italic;padding:12px;text-align:center">No tiers selected — pick some in the ⚙ preferences below</div></div>`;
+  }
   return `<div class="pop-tier-table">
-    ${orderedTiers(s).map((t) => `
+    ${tiers.map((t) => `
       <div class="tier-row ${t.cls}">
         <span class="tier-label">${t.label}</span>
         <span class="tier-price">${escapeHtml(fmtMoney(s[t.key]))}</span>
       </div>`).join('')}
   </div>`;
+}
+
+function renderTierPrefs(s) {
+  const anyTierValues = TIER_ORDER.filter((t) => s[t.key] != null);
+  if (anyTierValues.length === 0) return '';
+  return `<details class="tier-prefs">
+    <summary>⚙ Tier preferences · click to configure which tiers to show</summary>
+    <div class="tier-prefs-body">
+      ${anyTierValues.map((t) => `
+        <label class="tier-pref-row">
+          <input type="checkbox" data-tier-pref="${t.tier}" ${isTierOn(t.tier) ? 'checked' : ''}>
+          <span class="tier-pref-swatch" style="background:${TIER_COLORS[t.tier]?.line || '#999'}"></span>
+          <span class="tier-pref-name">${t.label}</span>
+          <span class="tier-pref-value">${escapeHtml(fmtMoney(s[t.key]))}</span>
+        </label>`).join('')}
+    </div>
+  </details>`;
 }
 
 function renderCardTile(s, opts = {}) {
@@ -464,12 +530,15 @@ function renderCardTile(s, opts = {}) {
 }
 
 function renderCardPopover(s) {
-  const spark = renderMultiSparkline({
-    psa10: s.psa10_history || [],
-    ace10: s.ace10_history || [],
-    cgc_pristine_10: s.cgc_pristine_10_history || [],
-  }, { W: 460, H: 200, padL: 52, padR: 60, padT: 18, padB: 34 });
+  const seriesByTier = {};
+  for (const t of TIER_ORDER) {
+    if (!isTierOn(t.tier)) continue;
+    const hist = s[t.tier + '_history'];
+    if (Array.isArray(hist) && hist.length) seriesByTier[t.tier] = hist;
+  }
+  const spark = renderMultiSparkline(seriesByTier, { W: 500, H: 220, padL: 52, padR: 90, padT: 18, padB: 34 });
   const table = renderCardTierTable(s);
+  const prefs = renderTierPrefs(s);
   const updated = s.pc_updated_at ? fmtAgo(s.pc_updated_at) : 'not fetched';
   return `<div class="card-popover">
     <div class="pop-head">
@@ -481,6 +550,7 @@ function renderCardPopover(s) {
     </div>
     ${table}
     <div class="pop-chart">${spark}</div>
+    ${prefs}
     <div class="pop-updated">Updated ${updated} · click card to filter auctions</div>
   </div>`;
 }
@@ -1326,6 +1396,22 @@ document.getElementById('drawer-save').onclick = async () => {
     btn.textContent = orig;
   }
 };
+
+// Help modal
+document.getElementById('toggle-help').onclick = () => {
+  document.getElementById('help-modal').hidden = false;
+};
+document.querySelectorAll('[data-modal-close]').forEach((el) => {
+  el.onclick = () => { document.getElementById('help-modal').hidden = true; };
+});
+
+// Tier preference checkbox changes — delegated so it works after each re-render
+document.body.addEventListener('change', (e) => {
+  const cb = e.target.closest('input[data-tier-pref]');
+  if (!cb) return;
+  setTierPref(cb.dataset.tierPref, cb.checked);
+  renderSearches(); // re-render popovers with the new pref applied
+});
 
 loadRecipients();
 loadSettings();
