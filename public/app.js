@@ -381,10 +381,16 @@ const TIER_ORDER = [
   { key: 'pc_ace10_cents',           label: 'ACE 10',          cls: 'ace10' },
 ];
 
-function renderCardTierChips(s, opts = {}) {
-  const small = opts.small;
+// Order tiers by current price, highest first.
+function orderedTiers(s) {
   return TIER_ORDER
     .filter((t) => s[t.key] != null)
+    .sort((a, b) => (s[b.key] ?? 0) - (s[a.key] ?? 0));
+}
+
+function renderCardTierChips(s, opts = {}) {
+  const small = opts.small;
+  return orderedTiers(s)
     .map(
       (t) =>
         `<span class="pc-tier ${t.cls}${small ? ' small' : ''}"><span class="label">${t.label}</span><span class="value">${escapeHtml(fmtMoney(s[t.key]))}</span></span>`
@@ -395,7 +401,7 @@ function renderCardTierChips(s, opts = {}) {
 // Vertical table-like tier list — one tier per row, label left, price right.
 function renderCardTierTable(s) {
   return `<div class="pop-tier-table">
-    ${TIER_ORDER.filter((t) => s[t.key] != null).map((t) => `
+    ${orderedTiers(s).map((t) => `
       <div class="tier-row ${t.cls}">
         <span class="tier-label">${t.label}</span>
         <span class="tier-price">${escapeHtml(fmtMoney(s[t.key]))}</span>
