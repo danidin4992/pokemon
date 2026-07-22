@@ -78,9 +78,10 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS pc_price_history (
     search_id INTEGER NOT NULL REFERENCES searches(id) ON DELETE CASCADE,
+    tier TEXT NOT NULL DEFAULT 'psa10',
     ts_ms INTEGER NOT NULL,
     price_cents INTEGER NOT NULL,
-    PRIMARY KEY (search_id, ts_ms)
+    PRIMARY KEY (search_id, tier, ts_ms)
   );
 
   CREATE TABLE IF NOT EXISTS hot_listings (
@@ -142,6 +143,24 @@ function migrate() {
   add('pc_ace10_cents', 'INTEGER');
   add('pc_cgc_pristine_10_cents', 'INTEGER');
   add('pc_updated_at', 'INTEGER');
+
+  // Add tier column to pc_price_history if absent, backfill existing rows as psa10
+  const histCols = db.prepare(`PRAGMA table_info(pc_price_history)`).all().map((c) => c.name);
+  if (histCols.length && !histCols.includes('tier')) {
+    db.exec(`
+      ALTER TABLE pc_price_history RENAME TO _pc_price_history_old;
+      CREATE TABLE pc_price_history (
+        search_id INTEGER NOT NULL REFERENCES searches(id) ON DELETE CASCADE,
+        tier TEXT NOT NULL DEFAULT 'psa10',
+        ts_ms INTEGER NOT NULL,
+        price_cents INTEGER NOT NULL,
+        PRIMARY KEY (search_id, tier, ts_ms)
+      );
+      INSERT INTO pc_price_history (search_id, tier, ts_ms, price_cents)
+        SELECT search_id, 'psa10', ts_ms, price_cents FROM _pc_price_history_old;
+      DROP TABLE _pc_price_history_old;
+    `);
+  }
   add('required_keywords', 'TEXT'); // JSON array of strings
   add('forbidden_keywords', 'TEXT'); // JSON array of strings
   add('pc_image_url', 'TEXT'); // PriceCharting product image
@@ -583,30 +602,54 @@ export function markNotified(id, error = null) {
 }
 
 const upsertHistoryStmt = db.prepare(
-  `INSERT INTO pc_price_history (search_id, ts_ms, price_cents)
-   VALUES (?, ?, ?)
-   ON CONFLICT(search_id, ts_ms) DO UPDATE SET price_cents = excluded.price_cents`
+  `INSERT INTO pc_price_history (search_id, tier, ts_ms, price_cents)
+   VALUES (?, ?, ?, ?)
+   ON CONFLICT(search_id, tier, ts_ms) DO UPDATE SET price_cents = excluded.price_cents`
 );
 
-export function upsertPriceHistory(searchId, history) {
+export function upsertPriceHistory(searchId, history, tier = 'psa10') {
   if (!Array.isArray(history) || history.length === 0) return;
   const tx = db.transaction((items) => {
     for (const p of items) {
       if (p && p.ts_ms && p.cents > 0) {
-        upsertHistoryStmt.run(searchId, p.ts_ms, p.cents);
+        upsertHistoryStmt.run(searchId, tier, p.ts_ms, p.cents);
       }
     }
   });
   tx(history);
 }
 
-export function getPriceHistory(searchId) {
+export function snapshotTierPrice(searchId, tier, priceCents) {
+  if (!priceCents || priceCents <= 0) return;
+  // Snap ts to the current day at 00:00 UTC so re-runs on the same day
+  // overwrite instead of accumulating.
+  const now = new Date();
+  const dayMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  upsertHistoryStmt.run(searchId, tier, dayMs, priceCents);
+}
+
+export function getPriceHistory(searchId, tier = 'psa10') {
   return db
     .prepare(
       `SELECT ts_ms, price_cents FROM pc_price_history
-       WHERE search_id = ? ORDER BY ts_ms ASC`
+       WHERE search_id = ? AND tier = ? ORDER BY ts_ms ASC`
+    )
+    .all(searchId, tier);
+}
+
+export function getAllPriceHistories(searchId) {
+  const rows = db
+    .prepare(
+      `SELECT tier, ts_ms, price_cents FROM pc_price_history
+       WHERE search_id = ? ORDER BY tier, ts_ms ASC`
     )
     .all(searchId);
+  const out = {};
+  for (const r of rows) {
+    if (!out[r.tier]) out[r.tier] = [];
+    out[r.tier].push({ ts_ms: r.ts_ms, price_cents: r.price_cents });
+  }
+  return out;
 }
 
 if (process.argv.includes('--init')) {

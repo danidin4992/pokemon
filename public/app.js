@@ -174,6 +174,99 @@ function fmtUsdCompact(cents) {
   return '$' + Math.round(d);
 }
 
+const TIER_COLORS = {
+  psa10: { line: '#e05a1c', fill: '#fce9dc', name: 'PSA 10' },
+  ace10: { line: '#1b7a3d', fill: '#daf1e0', name: 'ACE 10' },
+  cgc_pristine_10: { line: '#0053a0', fill: '#dbe7f4', name: 'CGC Pristine 10' },
+};
+
+function renderMultiSparkline(seriesByTier, opts = {}) {
+  const W = opts.W || 460;
+  const H = opts.H || 180;
+  const PAD_L = opts.padL ?? 52;
+  const PAD_R = opts.padR ?? 60;
+  const PAD_T = opts.padT ?? 20;
+  const PAD_B = opts.padB ?? 38;
+
+  // Filter to tiers that actually have data
+  const active = Object.keys(seriesByTier)
+    .filter((k) => TIER_COLORS[k] && Array.isArray(seriesByTier[k]) && seriesByTier[k].some((p) => p.price_cents > 0))
+    .map((k) => ({
+      tier: k,
+      color: TIER_COLORS[k],
+      points: seriesByTier[k].filter((p) => p.price_cents > 0),
+    }));
+  if (active.length === 0) return '';
+
+  // Global scale across all tiers
+  const allValues = active.flatMap((s) => s.points.map((p) => p.price_cents));
+  const allTimes = active.flatMap((s) => s.points.map((p) => p.ts_ms));
+  const min = Math.min(...allValues);
+  const max = Math.max(...allValues);
+  const range = max - min || 1;
+  const tMin = Math.min(...allTimes);
+  const tMax = Math.max(...allTimes);
+  const tRange = tMax - tMin || 1;
+
+  const chartW = W - PAD_L - PAD_R;
+  const chartH = H - PAD_T - PAD_B;
+  const xy = (p) => ({
+    x: PAD_L + ((p.ts_ms - tMin) / tRange) * chartW,
+    y: PAD_T + (1 - (p.price_cents - min) / range) * chartH,
+  });
+
+  // Axis lines + labels
+  const midVal = min + range / 2;
+  const gridMaxY = PAD_T;
+  const gridMidY = PAD_T + chartH / 2;
+  const gridMinY = PAD_T + chartH;
+
+  // Series paths
+  let seriesSvg = '';
+  const legendItems = [];
+  for (const s of active) {
+    const pts = s.points.map(xy);
+    if (pts.length === 1) {
+      // single dot only — draw a bigger dot with label
+      const p = pts[0];
+      seriesSvg += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4" fill="${s.color.line}" stroke="white" stroke-width="1.5"/>`;
+      seriesSvg += `<title>${s.color.name}: ${fmtUsd(s.points[0].price_cents)} (just started tracking)</title>`;
+    } else {
+      const d = 'M' + pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' L');
+      seriesSvg += `<path d="${d}" fill="none" stroke="${s.color.line}" stroke-width="1.7"/>`;
+      // Dots per point
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i];
+        seriesSvg += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2" fill="${s.color.line}"><title>${new Date(s.points[i].ts_ms).toISOString().slice(0, 10)}: ${fmtUsd(s.points[i].price_cents)}</title></circle>`;
+      }
+      // Highlight last point
+      const last = pts[pts.length - 1];
+      seriesSvg += `<circle cx="${last.x.toFixed(1)}" cy="${last.y.toFixed(1)}" r="3.4" fill="${s.color.line}" stroke="white" stroke-width="1.5"/>`;
+    }
+    legendItems.push(
+      `<span class="legend-item"><span class="legend-swatch" style="background:${s.color.line}"></span>${s.color.name} <strong>${fmtUsd(s.points[s.points.length - 1].price_cents)}</strong></span>`
+    );
+  }
+
+  const firstDate = new Date(tMin).toISOString().slice(0, 7);
+  const lastDate = new Date(tMax).toISOString().slice(0, 7);
+
+  return `<div class="multi-spark-wrap">
+    <div class="multi-spark-legend">${legendItems.join('')}</div>
+    <svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto">
+      <line x1="${PAD_L}" y1="${gridMaxY}" x2="${W - PAD_R}" y2="${gridMaxY}" stroke="#eee" stroke-width="0.5" stroke-dasharray="2,3"/>
+      <line x1="${PAD_L}" y1="${gridMidY}" x2="${W - PAD_R}" y2="${gridMidY}" stroke="#f2f2f2" stroke-width="0.5" stroke-dasharray="2,3"/>
+      <line x1="${PAD_L}" y1="${gridMinY}" x2="${W - PAD_R}" y2="${gridMinY}" stroke="#eee" stroke-width="0.5" stroke-dasharray="2,3"/>
+      <text x="${PAD_L - 4}" y="${gridMaxY + 3}" text-anchor="end" font-size="10" fill="#888" font-family="system-ui">${fmtUsdCompact(max)}</text>
+      <text x="${PAD_L - 4}" y="${gridMidY + 3}" text-anchor="end" font-size="9" fill="#aaa" font-family="system-ui">${fmtUsdCompact(midVal)}</text>
+      <text x="${PAD_L - 4}" y="${gridMinY + 3}" text-anchor="end" font-size="10" fill="#888" font-family="system-ui">${fmtUsdCompact(min)}</text>
+      ${seriesSvg}
+      <text x="${PAD_L}" y="${H - 6}" text-anchor="start" font-size="9" fill="#888" font-family="system-ui">${firstDate}</text>
+      <text x="${W - PAD_R}" y="${H - 6}" text-anchor="end" font-size="9" fill="#888" font-family="system-ui">${lastDate}</text>
+    </svg>
+  </div>`;
+}
+
 function renderSparkline(history, currentCents, opts = {}) {
   if (!Array.isArray(history) || history.length < 2) return '';
   const W = opts.W || 320;
@@ -344,9 +437,11 @@ function renderCardTile(s) {
 }
 
 function renderCardPopover(s) {
-  const spark = renderSparkline(s.psa10_history, s.pc_psa10_cents, {
-    W: 460, H: 180, padL: 52, padR: 60, padT: 20, padB: 28,
-  });
+  const spark = renderMultiSparkline({
+    psa10: s.psa10_history || [],
+    ace10: s.ace10_history || [],
+    cgc_pristine_10: s.cgc_pristine_10_history || [],
+  }, { W: 460, H: 200, padL: 52, padR: 60, padT: 18, padB: 34 });
   const chips = renderCardTierChips(s);
   const updated = s.pc_updated_at ? fmtAgo(s.pc_updated_at) : 'not fetched';
   return `<div class="card-popover">
@@ -358,10 +453,7 @@ function renderCardPopover(s) {
       <a class="pop-open" href="${escapeHtml(s.pricecharting_url || '')}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open ↗</a>
     </div>
     <div class="pop-tiers">${chips}</div>
-    <div class="pop-chart">
-      <div class="pop-chart-label">PSA 10 · 6mo</div>
-      ${spark}
-    </div>
+    <div class="pop-chart">${spark}</div>
     <div class="pop-updated">Updated ${updated} · click card to filter auctions</div>
   </div>`;
 }

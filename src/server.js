@@ -21,6 +21,8 @@ import {
   activeNotificationsByListing,
   upsertPriceHistory,
   getPriceHistory,
+  getAllPriceHistories,
+  snapshotTierPrice,
   markHot,
   unmarkHot,
   activeHotListingIds,
@@ -76,10 +78,15 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 
 app.get('/api/searches', (req, res) => {
   const rows = listSearches();
-  const enriched = rows.map((s) => ({
-    ...s,
-    psa10_history: getPriceHistory(s.id),
-  }));
+  const enriched = rows.map((s) => {
+    const all = getAllPriceHistories(s.id);
+    return {
+      ...s,
+      psa10_history: all.psa10 || [],
+      ace10_history: all.ace10 || [],
+      cgc_pristine_10_history: all.cgc_pristine_10 || [],
+    };
+  });
   res.json(enriched);
 });
 
@@ -128,7 +135,10 @@ app.post('/api/searches/:id/refresh-prices', async (req, res) => {
   try {
     const info = await fetchProductInfo(search.pricecharting_url);
     updateSearchPrices(id, info);
-    if (info.psa10_history?.length) upsertPriceHistory(id, info.psa10_history);
+    if (info.psa10_history?.length) upsertPriceHistory(id, info.psa10_history, 'psa10');
+    snapshotTierPrice(id, 'psa10', info.prices?.psa10);
+    snapshotTierPrice(id, 'ace10', info.prices?.ace10);
+    snapshotTierPrice(id, 'cgc_pristine_10', info.prices?.cgc_pristine_10);
     res.json({ ok: true, info });
   } catch (e) {
     res.status(500).json({ error: e.message });

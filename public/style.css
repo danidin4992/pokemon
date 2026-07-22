@@ -457,6 +457,29 @@ h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; 
   letter-spacing: 0.05em;
   margin-bottom: 4px;
 }
+
+.multi-spark-wrap { }
+.multi-spark-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 6px;
+  font-size: 11px;
+  color: #555;
+}
+.multi-spark-legend .legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 500;
+}
+.multi-spark-legend .legend-item strong { color: #1a1a1a; }
+.multi-spark-legend .legend-swatch {
+  width: 12px;
+  height: 3px;
+  border-radius: 2px;
+  display: inline-block;
+}
 .pc-strip .pc-link {
   color: #0053a0;
   text-decoration: none;

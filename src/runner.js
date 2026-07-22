@@ -6,6 +6,7 @@ import {
   updateSearchPrices,
   deleteListingsNotInSet,
   upsertPriceHistory,
+  snapshotTierPrice,
 } from './db.js';
 import { datasource } from './datasource.js';
 import { fetchProductInfo } from './pricecharting.js';
@@ -53,8 +54,14 @@ export async function runAllSearches({ onProgress, filterSearch } = {}) {
           const info = await fetchProductInfo(search.pricecharting_url);
           updateSearchPrices(search.id, info);
           if (info.psa10_history && info.psa10_history.length) {
-            upsertPriceHistory(search.id, info.psa10_history);
+            upsertPriceHistory(search.id, info.psa10_history, 'psa10');
           }
+          // Snapshot today's ACE 10 and CGC Pristine 10 — PriceCharting doesn't
+          // give us historical curves for these tiers, so we build our own
+          // series one point per day, starting from now.
+          snapshotTierPrice(search.id, 'psa10', info.prices?.psa10);
+          snapshotTierPrice(search.id, 'ace10', info.prices?.ace10);
+          snapshotTierPrice(search.id, 'cgc_pristine_10', info.prices?.cgc_pristine_10);
           onProgress?.({ stage: 'pc-fetched', search, info });
         } catch (e) {
           onProgress?.({ stage: 'pc-error', search, error: e.message });
