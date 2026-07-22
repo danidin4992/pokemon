@@ -1065,27 +1065,6 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
-$('#add-search-form').onsubmit = async (e) => {
-  e.preventDefault();
-  const name = $('#search-name').value.trim();
-  const url = $('#search-url').value.trim();
-  const pricecharting_url = $('#search-pc-url').value.trim() || null;
-  const res = await fetch('/api/searches', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, url, pricecharting_url }),
-  });
-  if (res.ok) {
-    $('#search-name').value = '';
-    $('#search-url').value = '';
-    $('#search-pc-url').value = '';
-    toast(pricecharting_url ? 'Search added — fetching PriceCharting…' : 'Search added');
-    setTimeout(loadSearches, pricecharting_url ? 1500 : 0);
-  } else {
-    const err = await res.json();
-    toast(err.error || 'Failed');
-  }
-};
 
 $('#run-now').onclick = async () => {
   const btn = $('#run-now');
@@ -1314,15 +1293,21 @@ if (clearBtn) {
   };
 }
 
-// ================== Edit drawer ==================
+// ================== Edit / Add drawer ==================
+// id === null → create mode; otherwise editing that search.
 function openEditDrawer(id) {
-  const s = searches.find((x) => x.id === id);
+  const isCreate = id == null;
+  const s = isCreate
+    ? { name: '', url: '', pricecharting_url: '', pack_odds: null, required_keywords: null, forbidden_keywords: null }
+    : searches.find((x) => x.id === id);
   if (!s) return;
   const reqTags = safeParseJsonArray(s.required_keywords);
   const forTags = safeParseJsonArray(s.forbidden_keywords);
   const body = document.getElementById('drawer-body');
   const title = document.getElementById('drawer-title');
-  title.textContent = 'Edit · ' + s.name;
+  const saveBtn = document.getElementById('drawer-save');
+  title.textContent = isCreate ? 'Add new card' : 'Edit · ' + s.name;
+  saveBtn.textContent = isCreate ? 'Add card' : 'Save changes';
   body.innerHTML = `
     <div class="edit-row">
       <label>Card name</label>
@@ -1359,8 +1344,11 @@ function openEditDrawer(id) {
     required: createTagInput(reqEl, reqTags, 'e.g. Charizard'),
     forbidden: createTagInput(forEl, forTags, 'e.g. proxy'),
     id,
+    isCreate,
   };
   document.getElementById('edit-drawer').hidden = false;
+  // Focus first field on open
+  setTimeout(() => body.querySelector('[data-edit="name"]')?.focus(), 50);
 }
 function closeEditDrawer() {
   document.getElementById('edit-drawer').hidden = true;
@@ -1371,12 +1359,18 @@ document.querySelectorAll('[data-drawer-close]').forEach((el) => {
 });
 document.getElementById('drawer-save').onclick = async () => {
   const body = document.getElementById('drawer-body');
-  const id = drawerTagInputs.id;
+  const { id, isCreate } = drawerTagInputs;
   const get = (k) => body.querySelector(`[data-edit="${k}"]`).value.trim();
   const packOddsRaw = get('pack_odds');
+  const name = get('name');
+  const url = get('url');
+  if (!name || !url) {
+    toast('Name and eBay URL are required');
+    return;
+  }
   const payload = {
-    name: get('name'),
-    url: get('url'),
+    name,
+    url,
     pricecharting_url: get('pricecharting_url') || null,
     pack_odds: packOddsRaw === '' ? null : parseInt(packOddsRaw),
     required_keywords: drawerTagInputs.required.get(),
@@ -1385,15 +1379,17 @@ document.getElementById('drawer-save').onclick = async () => {
   const btn = document.getElementById('drawer-save');
   btn.disabled = true;
   const orig = btn.textContent;
-  btn.textContent = 'Saving…';
+  btn.textContent = isCreate ? 'Adding…' : 'Saving…';
   try {
-    const res = await fetch(`/api/searches/${id}`, {
-      method: 'PATCH',
+    const path = isCreate ? '/api/searches' : `/api/searches/${id}`;
+    const method = isCreate ? 'POST' : 'PATCH';
+    const res = await fetch(path, {
+      method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
     if (res.ok) {
-      toast('Saved');
+      toast(isCreate ? 'Card added' : 'Saved');
       closeEditDrawer();
       await loadSearches();
       await loadListings();
@@ -1406,6 +1402,9 @@ document.getElementById('drawer-save').onclick = async () => {
     btn.textContent = orig;
   }
 };
+
+// Add-card button opens the drawer in create mode
+document.getElementById('add-card-btn').onclick = () => openEditDrawer(null);
 
 // Help modal
 document.getElementById('toggle-help').onclick = () => {
