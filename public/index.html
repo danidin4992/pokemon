@@ -18,7 +18,7 @@
         <button id="toggle-help" class="secondary" title="Grading grades reference">📖 עזר</button>
         <button id="toggle-settings" class="secondary" title="Global keyword filters">⚙ Filters</button>
         <button id="run-now" class="primary">Run now</button>
-        <button id="send-email" class="secondary">Email digest</button>
+        <button id="toggle-links" class="secondary" title="Look up a cert number on the grading sites">🔗 Links</button>
       </div>
     </div>
   </header>
@@ -78,6 +78,26 @@
       <div class="modal-foot modal-foot-split">
         <button type="button" class="secondary" data-tiers-cancel>Cancel</button>
         <button type="button" class="primary" id="tiers-save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="links-modal" class="modal center-modal" hidden>
+    <div class="modal-backdrop" data-links-close></div>
+    <div class="modal-panel modal-panel-compact">
+      <div class="modal-head">
+        <h2>Cert lookup</h2>
+        <p class="modal-hint">Enter a certification number to open it on the grading site.</p>
+      </div>
+      <div class="modal-body">
+        <div class="cert-input-row">
+          <input type="text" id="cert-number" placeholder="Cert number — e.g. 12345678" autocomplete="off" spellcheck="false">
+          <button type="button" id="cert-clear" class="secondary btn-sm" title="Clear">✕</button>
+        </div>
+        <div id="cert-links" class="cert-links"></div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="primary" data-links-close>Close</button>
       </div>
     </div>
   </div>

@@ -673,6 +673,66 @@ h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; 
   font-weight: 500;
   color: #1a1a1a;
 }
+
+/* Cert lookup modal */
+.cert-input-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.cert-input-row input {
+  flex: 1;
+  padding: 9px 11px;
+  border: 1px solid #d5d8dc;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+}
+.cert-input-row input:focus {
+  outline: none;
+  border-color: #0053a0;
+  box-shadow: 0 0 0 3px rgba(0, 83, 160, 0.12);
+}
+.cert-links {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cert-row {
+  display: grid;
+  grid-template-columns: 46px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #eceef0;
+  border-radius: 6px;
+  text-decoration: none;
+  color: inherit;
+}
+.cert-row:hover { background: #f7f8fa; border-color: #d5d8dc; }
+.cert-row.disabled { opacity: 0.5; pointer-events: none; }
+.cert-badge {
+  display: inline-block;
+  padding: 3px 0;
+  border-radius: 4px;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-align: center;
+}
+.cert-url {
+  font-size: 11px;
+  color: #888;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cert-open {
+  font-size: 12px;
+  font-weight: 600;
+  color: #0053a0;
+}
 .card-popover .pop-chart {
   border-top: 1px dashed #f0dcc4;
   padding-top: 10px;

@@ -1088,20 +1088,6 @@ $('#run-now').onclick = async () => {
   }
 };
 
-$('#send-email').onclick = async () => {
-  const btn = $('#send-email');
-  btn.disabled = true;
-  btn.textContent = 'Sending…';
-  try {
-    const res = await fetch('/api/send-email-now', { method: 'POST' });
-    const data = await res.json();
-    toast(res.ok ? 'Email sent' : data.error || 'Failed');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Email digest';
-  }
-};
-
 $('#filter-24h').onchange = renderListings;
 $('#filter-below-market').onchange = renderListings;
 $('#filter-search').onchange = () => {
@@ -1447,6 +1433,49 @@ document.getElementById('tiers-save').onclick = () => {
   toast('Tier preferences saved');
   closeTiersModal();
   renderSearches();
+};
+
+// ================== Cert lookup links modal ==================
+// Each grading company exposes a public cert page keyed by the number printed
+// on the slab. Cert formats differ per company, so the input stays free text.
+const CERT_PLATFORMS = [
+  { label: 'PSA', color: '#cf2e2e', hint: '8–9 digits',
+    url: (n) => `https://www.psacard.com/cert/${encodeURIComponent(n)}` },
+  { label: 'CGC', color: '#0b5cab', hint: '7–12 digits',
+    url: (n) => `https://www.cgccards.com/certlookup/${encodeURIComponent(n)}/` },
+  { label: 'ACE', color: '#0f9d8f', hint: 'digits only',
+    url: (n) => `https://acegrading.com/cert/${encodeURIComponent(n)}` },
+];
+
+function renderCertLinks() {
+  const n = $('#cert-number').value.trim();
+  $('#cert-links').innerHTML = CERT_PLATFORMS.map((p) => {
+    const href = n ? p.url(n) : '';
+    const attrs = n
+      ? `href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer"`
+      : 'aria-disabled="true"';
+    return `
+      <a class="cert-row${n ? '' : ' disabled'}" ${attrs}>
+        <span class="cert-badge" style="background:${p.color}">${p.label}</span>
+        <span class="cert-url">${n ? escapeHtml(href) : p.hint}</span>
+        <span class="cert-open">Open ↗</span>
+      </a>`;
+  }).join('');
+}
+
+$('#toggle-links').onclick = () => {
+  $('#links-modal').hidden = false;
+  renderCertLinks();
+  setTimeout(() => $('#cert-number').focus(), 50);
+};
+document.querySelectorAll('[data-links-close]').forEach((el) => {
+  el.onclick = () => { $('#links-modal').hidden = true; };
+});
+$('#cert-number').oninput = renderCertLinks;
+$('#cert-clear').onclick = () => {
+  $('#cert-number').value = '';
+  renderCertLinks();
+  $('#cert-number').focus();
 };
 
 loadRecipients();
