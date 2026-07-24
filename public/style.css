@@ -90,8 +90,26 @@ section { margin-bottom: 0; }
 h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; letter-spacing: 0.05em; }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .section-head h2 { margin: 0; }
-.filters { display: flex; gap: 12px; align-items: center; font-size: 13px; }
+.filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; font-size: 13px; }
 .filters select { padding: 4px 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 13px; }
+.filters .filter-title {
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  font-size: 13px;
+  font-family: inherit;
+  width: 200px;
+}
+.filters .filter-title:focus {
+  outline: none;
+  border-color: #0053a0;
+  box-shadow: 0 0 0 3px rgba(0, 83, 160, 0.12);
+}
+.filters .filter-count {
+  font-size: 12px;
+  color: #888;
+  font-variant-numeric: tabular-nums;
+}
 .filters .filter-clear {
   padding: 4px 10px;
   font-size: 12px;

@@ -774,6 +774,17 @@ function renderListings() {
   if (currentSearchFilters.size > 0) {
     filtered = filtered.filter((l) => currentSearchFilters.has(l.search_id));
   }
+  // Free-text match on the listing title, case-insensitive. Runs last so it
+  // narrows whatever the card/date filters already selected.
+  const titleQuery = ($('#filter-title')?.value || '').trim().toLowerCase();
+  const beforeTitle = filtered.length;
+  if (titleQuery) {
+    filtered = filtered.filter((l) => (l.title || '').toLowerCase().includes(titleQuery));
+  }
+  const countEl = $('#filter-title-count');
+  if (countEl) {
+    countEl.textContent = titleQuery ? `${filtered.length} / ${beforeTitle}` : '';
+  }
   const searchId = currentSearchFilters.size === 1 ? [...currentSearchFilters][0] : null;
 
   const container = $('#listings-list');
@@ -793,7 +804,10 @@ function renderListings() {
   }
 
   if (filtered.length === 0) {
-    container.innerHTML = priceSummaryHtml + '<div class="empty">No auctions matching the current filter. Hit "Run now" to scrape.</div>';
+    const msg = titleQuery
+      ? `No titles contain “${escapeHtml(titleQuery)}”.`
+      : 'No auctions matching the current filter. Hit "Run now" to scrape.';
+    container.innerHTML = priceSummaryHtml + `<div class="empty">${msg}</div>`;
     return;
   }
 
@@ -1090,6 +1104,10 @@ $('#run-now').onclick = async () => {
 
 $('#filter-24h').onchange = renderListings;
 $('#filter-below-market').onchange = renderListings;
+$('#filter-title').oninput = () => {
+  updateClearBtn();
+  renderListings();
+};
 $('#filter-search').onchange = () => {
   const v = $('#filter-search').value;
   currentSearchFilters.clear();
@@ -1119,9 +1137,15 @@ function syncFilterDropdown() {
   if (count === 1) sel.value = String([...currentSearchFilters][0]);
   else if (count === 0) sel.value = '';
   else sel.value = '__multi__';
-  // Show/hide clear button
+  updateClearBtn();
+}
+
+// Clear is offered whenever any filter narrows the list — card selection or title text.
+function updateClearBtn() {
   const clearBtn = $('#filter-clear');
-  if (clearBtn) clearBtn.style.display = count > 0 ? 'inline-flex' : 'none';
+  if (!clearBtn) return;
+  const hasTitleQuery = !!($('#filter-title')?.value || '').trim();
+  clearBtn.style.display = currentSearchFilters.size > 0 || hasTitleQuery ? 'inline-flex' : 'none';
 }
 
 // Delegate notify checkbox toggles for the whole listings list
@@ -1271,6 +1295,8 @@ const clearBtn = document.getElementById('filter-clear');
 if (clearBtn) {
   clearBtn.onclick = () => {
     currentSearchFilters.clear();
+    const titleEl = $('#filter-title');
+    if (titleEl) titleEl.value = '';
     syncFilterDropdown();
     renderSearches();
     renderListings();
