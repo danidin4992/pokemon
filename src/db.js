@@ -116,6 +116,32 @@ db.exec(`
     error TEXT,
     email_sent INTEGER NOT NULL DEFAULT 0
   );
+
+  -- Archive of auctions that have left the live listings table (ended / removed).
+  -- Populated when a scrape no longer sees a listing it saw before. This is the
+  -- only place a card's past auctions survive — the live 'listings' table is
+  -- overwritten every run.
+  CREATE TABLE IF NOT EXISTS listing_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    search_id INTEGER REFERENCES searches(id) ON DELETE CASCADE,
+    listing_id TEXT NOT NULL,
+    title TEXT,
+    url TEXT,
+    image_url TEXT,
+    price_numeric REAL,          -- last-seen bid in its native currency
+    price_currency TEXT,
+    price_text TEXT,
+    final_bid_usd_cents INTEGER, -- accurate close for hot-watched cards (from hot_polls)
+    bid_count INTEGER,
+    was_hot INTEGER NOT NULL DEFAULT 0,
+    ends_at INTEGER,
+    first_seen_at INTEGER,
+    last_seen_at INTEGER,
+    archived_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+    outcome TEXT,                -- 'ended' (past its end time) | 'vanished' (gone early)
+    UNIQUE(search_id, listing_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_listing_history_search ON listing_history(search_id, archived_at DESC);
 `);
 
 export function listSearches({ activeOnly = false } = {}) {
@@ -367,6 +393,140 @@ export function deleteListingsNotInSet(searchId, keepListingIds) {
   db.prepare(
     `DELETE FROM listings WHERE search_id = ? AND listing_id NOT IN (${placeholders})`
   ).run(searchId, ...keepListingIds);
+}
+
+const archiveListingStmt = db.prepare(`
+  INSERT INTO listing_history
+    (search_id, listing_id, title, url, image_url, price_numeric, price_currency, price_text,
+     final_bid_usd_cents, bid_count, was_hot, ends_at, first_seen_at, last_seen_at, archived_at, outcome)
+  VALUES
+    (@search_id, @listing_id, @title, @url, @image_url, @price_numeric, @price_currency, @price_text,
+     @final_bid_usd_cents, @bid_count, @was_hot, @ends_at, @first_seen_at, @last_seen_at,
+     strftime('%s','now'), @outcome)
+  ON CONFLICT(search_id, listing_id) DO UPDATE SET
+    -- A listing can briefly flap out of eBay's results and back; keep the newest
+    -- snapshot and never downgrade a known-good final bid to null.
+    title = excluded.title,
+    price_numeric = excluded.price_numeric,
+    price_currency = excluded.price_currency,
+    price_text = excluded.price_text,
+    final_bid_usd_cents = COALESCE(excluded.final_bid_usd_cents, listing_history.final_bid_usd_cents),
+    bid_count = excluded.bid_count,
+    was_hot = MAX(excluded.was_hot, listing_history.was_hot),
+    ends_at = excluded.ends_at,
+    last_seen_at = excluded.last_seen_at,
+    archived_at = strftime('%s','now'),
+    outcome = excluded.outcome
+`);
+
+// Move any listings for this search that the latest scrape no longer returned
+// into listing_history, then they are safe to delete. Call BEFORE
+// deleteListingsNotInSet so we capture the rows about to be removed.
+export function archiveDisappearedListings(searchId, seenListingIds) {
+  const seen = new Set(seenListingIds || []);
+  const current = db
+    .prepare('SELECT * FROM listings WHERE search_id = ?')
+    .all(searchId);
+  const gone = current.filter((l) => !seen.has(l.listing_id));
+  if (!gone.length) return 0;
+
+  const hotIds = activeHotListingIds();
+  const nowSec = Math.floor(Date.now() / 1000);
+  const finalBidStmt = db.prepare(
+    `SELECT bid_usd_cents, bid_count FROM hot_polls
+     WHERE listing_id = ? AND bid_usd_cents IS NOT NULL
+     ORDER BY ts_ms DESC LIMIT 1`
+  );
+
+  const run = db.transaction((rows) => {
+    for (const l of rows) {
+      const finalPoll = finalBidStmt.get(l.listing_id);
+      archiveListingStmt.run({
+        search_id: searchId,
+        listing_id: l.listing_id,
+        title: l.title,
+        url: l.url,
+        image_url: l.image_url ?? null,
+        price_numeric: l.price_numeric ?? null,
+        price_currency: l.price_currency ?? null,
+        price_text: l.price_text ?? null,
+        final_bid_usd_cents: finalPoll?.bid_usd_cents ?? null,
+        bid_count: finalPoll?.bid_count ?? l.bid_count ?? null,
+        was_hot: hotIds.has(l.listing_id) ? 1 : 0,
+        ends_at: l.ends_at ?? null,
+        first_seen_at: l.first_seen_at ?? null,
+        last_seen_at: l.last_seen_at ?? null,
+        // If it's past its end time it genuinely ended; otherwise it left early
+        // (seller pulled it, relisted, or eBay stopped returning it).
+        outcome: l.ends_at && l.ends_at <= nowSec ? 'ended' : 'vanished',
+      });
+    }
+  });
+  run(gone);
+  return gone.length;
+}
+
+const HISTORY_SELECT_COLS = `
+  h.*, s.name AS search_name,
+  s.pc_psa10_cents AS search_pc_psa10_cents,
+  s.pc_ace10_cents AS search_pc_ace10_cents,
+  s.pc_cgc_pristine_10_cents AS search_pc_cgc_pristine_10_cents
+`;
+
+export function listHistory({ searchId = null, hotOnly = false, limit = 500 } = {}) {
+  const where = [];
+  const params = [];
+  if (searchId) { where.push('h.search_id = ?'); params.push(searchId); }
+  if (hotOnly) where.push('h.was_hot = 1');
+  const sql = `
+    SELECT ${HISTORY_SELECT_COLS}
+    FROM listing_history h
+    LEFT JOIN searches s ON s.id = h.search_id
+    ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+    ORDER BY COALESCE(h.ends_at, h.archived_at) DESC
+    LIMIT ?
+  `;
+  return db.prepare(sql).all(...params, limit);
+}
+
+// One-time seed: hot-watched auctions that already ended still sit in
+// hot_listings with a closing bid in hot_polls. Fold them into history so the
+// view isn't empty on day one. Idempotent via the UNIQUE(search_id, listing_id).
+export function backfillHistoryFromHot() {
+  const nowSec = Math.floor(Date.now() / 1000);
+  const ended = db
+    .prepare('SELECT * FROM hot_listings WHERE ends_at IS NOT NULL AND ends_at <= ?')
+    .all(nowSec);
+  if (!ended.length) return 0;
+  const finalBidStmt = db.prepare(
+    `SELECT bid_usd_cents, bid_count FROM hot_polls
+     WHERE listing_id = ? AND bid_usd_cents IS NOT NULL
+     ORDER BY ts_ms DESC LIMIT 1`
+  );
+  const run = db.transaction((rows) => {
+    for (const l of rows) {
+      const finalPoll = finalBidStmt.get(l.listing_id);
+      archiveListingStmt.run({
+        search_id: l.search_id ?? null,
+        listing_id: l.listing_id,
+        title: l.title ?? null,
+        url: l.url ?? null,
+        image_url: null,
+        price_numeric: null,
+        price_currency: null,
+        price_text: null,
+        final_bid_usd_cents: finalPoll?.bid_usd_cents ?? null,
+        bid_count: finalPoll?.bid_count ?? null,
+        was_hot: 1,
+        ends_at: l.ends_at ?? null,
+        first_seen_at: l.added_at ?? null,
+        last_seen_at: l.ends_at ?? null,
+        outcome: 'ended',
+      });
+    }
+  });
+  run(ended);
+  return ended.length;
 }
 
 const upsertListingStmt = db.prepare(`
@@ -676,6 +836,15 @@ export function getAllPriceHistories(searchId) {
     out[r.tier].push({ ts_ms: r.ts_ms, price_cents: r.price_cents });
   }
   return out;
+}
+
+// Seed history from already-ended hot auctions (runs once per process start;
+// idempotent). Placed at module end so the prepared statements above exist.
+try {
+  const seeded = backfillHistoryFromHot();
+  if (seeded) console.log(`🗂  Backfilled ${seeded} ended hot auction(s) into history`);
+} catch (e) {
+  console.error('history backfill failed:', e.message);
 }
 
 if (process.argv.includes('--init')) {

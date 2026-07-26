@@ -771,6 +771,9 @@ function renderListings() {
         l.price_usd_cents < l.search_pc_psa10_cents
     );
   }
+  if ($('#filter-watching')?.checked) {
+    filtered = filtered.filter((l) => l.is_hot);
+  }
   if (currentSearchFilters.size > 0) {
     filtered = filtered.filter((l) => currentSearchFilters.has(l.search_id));
   }
@@ -1104,6 +1107,7 @@ $('#run-now').onclick = async () => {
 
 $('#filter-24h').onchange = renderListings;
 $('#filter-below-market').onchange = renderListings;
+$('#filter-watching').onchange = renderListings;
 $('#filter-title').oninput = () => {
   updateClearBtn();
   renderListings();
@@ -1503,6 +1507,84 @@ $('#cert-clear').onclick = () => {
   renderCertLinks();
   $('#cert-number').focus();
 };
+
+// ================== Auction history modal ==================
+function fmtHistoryDate(sec) {
+  if (!sec) return '';
+  const d = new Date(sec * 1000);
+  const date = d.toLocaleDateString('en-GB', { timeZone: 'Asia/Jerusalem', day: '2-digit', month: 'short' });
+  const time = d.toLocaleTimeString('en-GB', { timeZone: 'Asia/Jerusalem', hour: '2-digit', minute: '2-digit', hour12: false });
+  return `${date}, ${time}`;
+}
+
+function renderHistoryRow(h) {
+  const price = h.price_usd_cents;
+  const dateStr = fmtHistoryDate(h.ends_at || h.archived_at);
+  const outcomeBadge = h.outcome === 'ended'
+    ? '<span class="hist-outcome ended">Ended</span>'
+    : '<span class="hist-outcome vanished">Removed early</span>';
+  const hot = h.was_hot ? '<span class="hist-hot">🔥 Watched</span>' : '';
+  const href = escapeHtml(h.url || '#');
+  return `
+    <div class="hist-row">
+      <a href="${href}" target="_blank" rel="noopener">
+        ${h.image_url ? `<img src="${escapeHtml(h.image_url)}" alt="">` : '<div class="hist-thumb-empty"></div>'}
+      </a>
+      <div class="hist-main">
+        <a class="hist-title" href="${href}" target="_blank" rel="noopener">${escapeHtml(h.title || '—')}</a>
+        <div class="hist-meta">
+          <span class="hist-card-badge">${escapeHtml(h.search_name || '—')}</span>
+          ${outcomeBadge}${hot}
+          <span class="hist-date">${dateStr}</span>
+        </div>
+      </div>
+      <div class="hist-price-block">
+        <div class="hist-price">${fmtUsd(price)}</div>
+        ${renderMarketInline(price, h)}
+        <div class="hist-bids">${h.bid_count ?? 0} bids</div>
+      </div>
+    </div>`;
+}
+
+async function loadHistory() {
+  const cardVal = $('#history-card').value;
+  const hot = $('#history-hot').checked;
+  const params = new URLSearchParams();
+  if (cardVal) params.set('search_id', cardVal);
+  if (hot) params.set('hot', '1');
+  const body = $('#history-body');
+  body.innerHTML = '<div class="empty">Loading…</div>';
+  try {
+    const res = await fetch('/api/history?' + params.toString());
+    const rows = await res.json();
+    $('#history-count').textContent = rows.length ? `${rows.length} auctions` : '';
+    if (!rows.length) {
+      body.innerHTML = '<div class="empty">No archived auctions yet. History fills in automatically as tracked auctions end.</div>';
+      return;
+    }
+    body.innerHTML = rows.map(renderHistoryRow).join('');
+  } catch (e) {
+    body.innerHTML = '<div class="empty">Failed to load history.</div>';
+  }
+}
+
+function openHistoryModal() {
+  const sel = $('#history-card');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">All watched cards</option>' +
+    searches.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+  // Preserve prior selection, else inherit a single active sidebar filter.
+  if (cur) sel.value = cur;
+  else if (currentSearchFilters.size === 1) sel.value = String([...currentSearchFilters][0]);
+  $('#history-modal').hidden = false;
+  loadHistory();
+}
+$('#toggle-history').onclick = openHistoryModal;
+document.querySelectorAll('[data-history-close]').forEach((el) => {
+  el.onclick = () => { $('#history-modal').hidden = true; };
+});
+$('#history-card').onchange = loadHistory;
+$('#history-hot').onchange = loadHistory;
 
 loadRecipients();
 loadSettings();

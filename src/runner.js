@@ -4,6 +4,7 @@ import {
   createRun,
   finishRun,
   updateSearchPrices,
+  archiveDisappearedListings,
   deleteListingsNotInSet,
   upsertPriceHistory,
   snapshotTierPrice,
@@ -39,8 +40,10 @@ export async function runAllSearches({ onProgress, filterSearch } = {}) {
         seenIds.push(l.listing_id);
       }
       // Authoritative: this run is the source of truth for this search.
-      // Any listings not in this run are gone from eBay's results — drop them.
+      // Any listings not in this run are gone from eBay's results. Archive
+      // them into history first, then drop them from the live table.
       if (listings.length > 0) {
+        archiveDisappearedListings(search.id, seenIds);
         deleteListingsNotInSet(search.id, seenIds);
       }
       totalFound += listings.length;

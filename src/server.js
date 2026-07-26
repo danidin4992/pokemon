@@ -12,6 +12,7 @@ import {
   clearListingsForSearch,
   listListings,
   listListingsForSearch,
+  listHistory,
   getLastRun,
   listRuns,
   getSettings,
@@ -211,6 +212,21 @@ app.get('/api/listings', (req, res) => {
   if (!includeExcluded) rows = filterListings(rows);
   rows = annotateUsd(rows);
   res.json(rows);
+});
+
+app.get('/api/history', (req, res) => {
+  const searchId = req.query.search_id ? parseInt(req.query.search_id) : null;
+  const hotOnly = req.query.hot === '1';
+  const rows = listHistory({ searchId, hotOnly });
+  const rates = getCachedRates();
+  const annotated = rows.map((r) => ({
+    ...r,
+    // Prefer the accurate closing bid captured by the hot poller; fall back to
+    // converting the last-seen native price.
+    price_usd_cents:
+      r.final_bid_usd_cents ?? toUsdCents(r.price_numeric, r.price_currency, rates),
+  }));
+  res.json(annotated);
 });
 
 const ALLOWED_LEADS = new Set([300, 900, 1800, 3600]);

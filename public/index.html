@@ -18,6 +18,7 @@
         <button id="toggle-help" class="secondary" title="Grading grades reference">📖 עזר</button>
         <button id="toggle-settings" class="secondary" title="Global keyword filters">⚙ Filters</button>
         <button id="run-now" class="primary">Run now</button>
+        <button id="toggle-history" class="secondary" title="Past auctions for your watched cards">🕘 History</button>
         <button id="toggle-links" class="secondary" title="Look up a cert number on the grading sites">🔗 Links</button>
       </div>
     </div>
@@ -55,6 +56,7 @@
           <div class="filters">
             <label><input type="checkbox" id="filter-24h" checked> Ending in 24h</label>
             <label><input type="checkbox" id="filter-below-market"> 🟢 Below market only</label>
+            <label><input type="checkbox" id="filter-watching"> 🔥 Watching only</label>
             <select id="filter-search">
               <option value="">All searches</option>
             </select>
@@ -80,6 +82,27 @@
       <div class="modal-foot modal-foot-split">
         <button type="button" class="secondary" data-tiers-cancel>Cancel</button>
         <button type="button" class="primary" id="tiers-save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="history-modal" class="modal center-modal" hidden>
+    <div class="modal-backdrop" data-history-close></div>
+    <div class="modal-panel modal-panel-wide">
+      <div class="modal-head">
+        <h2>Auction history</h2>
+        <p class="modal-hint">Auctions that ended or left eBay, archived from past scrapes. Builds up over time.</p>
+        <div class="history-controls">
+          <select id="history-card">
+            <option value="">All watched cards</option>
+          </select>
+          <label><input type="checkbox" id="history-hot"> 🔥 Watched only</label>
+          <span id="history-count" class="filter-count"></span>
+        </div>
+      </div>
+      <div class="modal-body" id="history-body"></div>
+      <div class="modal-foot">
+        <button type="button" class="primary" data-history-close>Close</button>
       </div>
     </div>
   </div>

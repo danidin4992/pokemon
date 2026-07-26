@@ -751,6 +751,88 @@ h2 { font-size: 16px; margin: 0 0 12px; color: #444; text-transform: uppercase; 
   font-weight: 600;
   color: #0053a0;
 }
+
+/* Auction history modal */
+.modal-panel-wide { width: min(780px, 96vw); }
+.history-controls {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.history-controls select {
+  padding: 5px 9px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  font-size: 13px;
+}
+.history-controls label {
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+.hist-row {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 4px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.hist-row:last-child { border-bottom: none; }
+.hist-row img,
+.hist-thumb-empty {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: #f0f0f0;
+  display: block;
+}
+.hist-main { min-width: 0; }
+.hist-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0053a0;
+  text-decoration: none;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hist-title:hover { text-decoration: underline; }
+.hist-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: #888;
+}
+.hist-card-badge {
+  background: #eef1f5;
+  color: #556;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+.hist-outcome {
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+.hist-outcome.ended { background: #e6f4ea; color: #1e7e40; }
+.hist-outcome.vanished { background: #fdecec; color: #b3341f; }
+.hist-hot { color: #d9641e; font-weight: 600; }
+.hist-date { color: #999; }
+.hist-price-block { text-align: right; white-space: nowrap; }
+.hist-price { font-size: 15px; font-weight: 700; color: #1a1a1a; }
+.hist-price-block .market-inline { justify-content: flex-end; }
+.hist-bids { font-size: 11px; color: #999; margin-top: 2px; }
 .card-popover .pop-chart {
   border-top: 1px dashed #f0dcc4;
   padding-top: 10px;
