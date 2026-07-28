@@ -7,6 +7,11 @@ let recipients = [];
 let currentRecipient = localStorage.getItem('pokemon-recipient') || 'daniel';
 const currentSearchFilters = new Set(); // multi-select card ids (empty = show all)
 const editingSearchId = new Set();
+// Live auction-list filter state (lower-cased). Kept in sync by the tag inputs.
+let includeTerms = [];
+let excludeTerms = [];
+let includeTagInput = null;
+let excludeTagInput = null;
 
 function parseCsv(v) {
   if (!v) return [];
@@ -17,8 +22,9 @@ function joinCsv(arr) {
   return arr.join(', ');
 }
 
-function createTagInput(container, initialTags = [], placeholder = 'Type and press Enter…') {
+function createTagInput(container, initialTags = [], placeholder = 'Type and press Enter…', onChange = null) {
   let tags = Array.isArray(initialTags) ? [...initialTags] : [];
+  const notify = () => { if (onChange) onChange([...tags]); };
 
   function render() {
     container.innerHTML =
@@ -39,6 +45,7 @@ function createTagInput(container, initialTags = [], placeholder = 'Type and pre
         tags.splice(parseInt(btn.dataset.i), 1);
         render();
         focusInput();
+        notify();
       };
     });
     const input = container.querySelector('.tag-add');
@@ -51,6 +58,7 @@ function createTagInput(container, initialTags = [], placeholder = 'Type and pre
         tags.pop();
         render();
         focusInput();
+        notify();
       }
     };
     input.onblur = () => commitInput();
@@ -62,6 +70,7 @@ function createTagInput(container, initialTags = [], placeholder = 'Type and pre
         for (const p of parts) if (!tags.includes(p)) tags.push(p);
         render();
         focusInput();
+        notify();
       }
     };
   }
@@ -74,6 +83,7 @@ function createTagInput(container, initialTags = [], placeholder = 'Type and pre
       tags.push(v);
       render();
       focusInput();
+      notify();
     }
   }
 
@@ -784,6 +794,26 @@ function renderListings() {
   if (titleQuery) {
     filtered = filtered.filter((l) => (l.title || '').toLowerCase().includes(titleQuery));
   }
+  // Include tags: keep a title only if it contains at least one term (any-of).
+  if (includeTerms.length) {
+    filtered = filtered.filter((l) => {
+      const t = (l.title || '').toLowerCase();
+      return includeTerms.some((term) => t.includes(term));
+    });
+  }
+  // Exclude tags: drop a title if it contains any term (none-of).
+  if (excludeTerms.length) {
+    filtered = filtered.filter((l) => {
+      const t = (l.title || '').toLowerCase();
+      return !excludeTerms.some((term) => t.includes(term));
+    });
+  }
+  // Max price: hide auctions whose current USD bid exceeds the cap.
+  const maxPriceUsd = parseFloat($('#filter-maxprice')?.value);
+  if (!isNaN(maxPriceUsd) && maxPriceUsd > 0) {
+    const capCents = Math.round(maxPriceUsd * 100);
+    filtered = filtered.filter((l) => l.price_usd_cents != null && l.price_usd_cents <= capCents);
+  }
   const countEl = $('#filter-title-count');
   if (countEl) {
     countEl.textContent = titleQuery ? `${filtered.length} / ${beforeTitle}` : '';
@@ -807,8 +837,11 @@ function renderListings() {
   }
 
   if (filtered.length === 0) {
-    const msg = titleQuery
-      ? `No titles contain “${escapeHtml(titleQuery)}”.`
+    const narrowing =
+      titleQuery || includeTerms.length || excludeTerms.length ||
+      !isNaN(maxPriceUsd) || $('#filter-watching')?.checked;
+    const msg = narrowing
+      ? 'No auctions match the current filters.'
       : 'No auctions matching the current filter. Hit "Run now" to scrape.';
     container.innerHTML = priceSummaryHtml + `<div class="empty">${msg}</div>`;
     return;
@@ -1105,13 +1138,28 @@ $('#run-now').onclick = async () => {
   }
 };
 
-$('#filter-24h').onchange = renderListings;
-$('#filter-below-market').onchange = renderListings;
-$('#filter-watching').onchange = renderListings;
+const onToggleFilter = () => { updateClearBtn(); renderListings(); };
+$('#filter-24h').onchange = onToggleFilter;
+$('#filter-below-market').onchange = onToggleFilter;
+$('#filter-watching').onchange = onToggleFilter;
 $('#filter-title').oninput = () => {
   updateClearBtn();
   renderListings();
 };
+$('#filter-maxprice').oninput = () => {
+  updateClearBtn();
+  renderListings();
+};
+
+// Include / Exclude keyword tag inputs — live-filter the auctions list.
+includeTagInput = createTagInput(
+  $('#filter-include'), [], 'title contains…',
+  (tags) => { includeTerms = tags.map((s) => s.toLowerCase()); updateClearBtn(); renderListings(); }
+);
+excludeTagInput = createTagInput(
+  $('#filter-exclude'), [], 'hide titles with…',
+  (tags) => { excludeTerms = tags.map((s) => s.toLowerCase()); updateClearBtn(); renderListings(); }
+);
 $('#filter-search').onchange = () => {
   const v = $('#filter-search').value;
   currentSearchFilters.clear();
@@ -1144,12 +1192,23 @@ function syncFilterDropdown() {
   updateClearBtn();
 }
 
-// Clear is offered whenever any filter narrows the list — card selection or title text.
+// Clear is offered whenever the filter state differs from the default view
+// (24h on, every other filter off/empty).
 function updateClearBtn() {
   const clearBtn = $('#filter-clear');
   if (!clearBtn) return;
   const hasTitleQuery = !!($('#filter-title')?.value || '').trim();
-  clearBtn.style.display = currentSearchFilters.size > 0 || hasTitleQuery ? 'inline-flex' : 'none';
+  const hasMaxPrice = !!($('#filter-maxprice')?.value || '').trim();
+  const active =
+    currentSearchFilters.size > 0 ||
+    hasTitleQuery ||
+    hasMaxPrice ||
+    includeTerms.length > 0 ||
+    excludeTerms.length > 0 ||
+    $('#filter-below-market')?.checked ||
+    $('#filter-watching')?.checked ||
+    $('#filter-24h')?.checked === false;
+  clearBtn.style.display = active ? 'inline-flex' : 'none';
 }
 
 // Delegate notify checkbox toggles for the whole listings list
@@ -1201,9 +1260,19 @@ $('#listings-list').addEventListener('click', async (e) => {
       const j = await res.json().catch(() => ({}));
       toast(j.error || 'Watch toggle failed');
     } else {
-      btn.classList.toggle('active');
-      btn.textContent = currentlyHot ? '🔥 Watch' : '🔥 Watching';
-      row.classList.toggle('is-hot');
+      // Keep the in-memory listing in sync so the "Watching only" filter sees
+      // this change without a full reload. Without this the filter reads a
+      // stale is_hot and silently drops just-watched listings.
+      const listing = listings.find((x) => x.listing_id === listingId);
+      if (listing) listing.is_hot = !currentlyHot;
+      if ($('#filter-watching')?.checked) {
+        // Membership in the filtered view changed — rebuild from data.
+        renderListings();
+      } else {
+        btn.classList.toggle('active');
+        btn.textContent = currentlyHot ? '🔥 Watch' : '🔥 Watching';
+        row.classList.toggle('is-hot');
+      }
       toast(currentlyHot ? 'Stopped watching' : 'Now watching intensively');
     }
   } catch (err) {
@@ -1298,9 +1367,20 @@ $('#save-settings').onclick = async () => {
 const clearBtn = document.getElementById('filter-clear');
 if (clearBtn) {
   clearBtn.onclick = () => {
+    // Reset every filter to the default view.
     currentSearchFilters.clear();
     const titleEl = $('#filter-title');
     if (titleEl) titleEl.value = '';
+    const maxEl = $('#filter-maxprice');
+    if (maxEl) maxEl.value = '';
+    // Reset the keyword tag inputs (set() doesn't fire onChange, so clear caches).
+    includeTagInput?.set([]);
+    excludeTagInput?.set([]);
+    includeTerms = [];
+    excludeTerms = [];
+    if ($('#filter-24h')) $('#filter-24h').checked = true;
+    if ($('#filter-below-market')) $('#filter-below-market').checked = false;
+    if ($('#filter-watching')) $('#filter-watching').checked = false;
     syncFilterDropdown();
     renderSearches();
     renderListings();

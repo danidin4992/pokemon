@@ -53,6 +53,7 @@
       <section id="listings-section">
         <div class="section-head">
           <h2>Active auctions</h2>
+          <div class="filters-wrap">
           <div class="filters">
             <label><input type="checkbox" id="filter-24h" checked> Ending in 24h</label>
             <label><input type="checkbox" id="filter-below-market"> 🟢 Below market only</label>
@@ -63,6 +64,21 @@
             <input type="search" id="filter-title" class="filter-title" placeholder="🔍 Search in titles…" autocomplete="off" spellcheck="false">
             <span id="filter-title-count" class="filter-count"></span>
             <button id="filter-clear" type="button" class="secondary filter-clear" style="display:none">✕ Clear</button>
+          </div>
+          <div class="filters filters-adv">
+            <div class="adv-filter">
+              <span class="adv-label">Include</span>
+              <div id="filter-include" class="tag-input" title="Show only titles containing at least one of these — Enter to add"></div>
+            </div>
+            <div class="adv-filter">
+              <span class="adv-label">Exclude</span>
+              <div id="filter-exclude" class="tag-input forbidden" title="Hide titles containing any of these — Enter to add"></div>
+            </div>
+            <div class="adv-filter">
+              <span class="adv-label">Max&nbsp;$</span>
+              <input type="number" id="filter-maxprice" class="filter-maxprice" min="0" step="1" placeholder="any" autocomplete="off">
+            </div>
+          </div>
           </div>
         </div>
         <div id="listings-list"></div>
